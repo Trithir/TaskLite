@@ -186,6 +186,12 @@ The goal is to reduce distraction by putting the task ahead of the app.
 - [ ] Test app relaunch persistence
 - [ ] Test notification behavior
 
+### Notes
+- Core task-transition regression coverage now exists in local unit tests for add-at-bottom, delete confirmation, reorder priority updates, uncheck-to-duplicate, and the 300ms completion pause before promotion.
+- Manual/device QA is still required for widget truncation, full expanded-text visibility, widget refresh behavior, notification behavior, and relaunch persistence because those depend on Compose/Glance/system surfaces that are not fully exercised by the current unit-test layer.
+- Current manual QA signal is positive: the app appears stable in desktop/emulator testing with no obvious user-visible bugs reported so far.
+- Remaining device-specific validation is mainly haptics, which is intentionally deferred until the app is available on physical hardware.
+
 ---
 
 ## Decisions already locked
@@ -276,5 +282,12 @@ The goal is to reduce distraction by putting the task ahead of the app.
   - Randomized the prompt selection while keeping the empty-state surface minimal and calm
   - Added a soft overload warning once the active list gets large, using the same tone family instead of introducing a new alert system
 - Next concrete implementation step:
-  - Finish the final Phase 7 QA pass against the shipped widget, notification, reorder, and text-display behaviors
+  - Finish the final Phase 7 manual device QA pass against the shipped widget, notification, reorder, and text-display behaviors
   - Keep the richer floating-gap reorder UX as a later polish follow-up, not a blocker for current phase work
+- Phase 7 progress this session:
+  - Added a small local unit-test layer for `ExpandedTasksViewModel` so the highest-risk task transitions are covered by automation instead of only manual QA
+  - Verified `testDebugUnitTest` and `assembleDebug` both pass after adding regression coverage for add, complete, uncheck, delete, and reorder behavior
+  - Manager call: keep the remaining Phase 7 checklist focused on device/manual validation for widget, notification, relaunch, and visual text-behavior surfaces
+- QA update:
+  - Latest user testing reports the app feels stable with no obvious bugs currently noticed
+  - Haptics have not been validated on a physical device yet, so that check remains intentionally parked until device install/testing is available
