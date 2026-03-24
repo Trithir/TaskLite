@@ -1,0 +1,185 @@
+package com.erics.tasklite.ui
+
+import android.view.HapticFeedbackConstants
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.erics.tasklite.data.TaskRepository
+import com.erics.tasklite.ui.expanded.ExpandedTaskRowUiState
+import com.erics.tasklite.ui.expanded.ExpandedTaskScreen
+import com.erics.tasklite.ui.expanded.ExpandedTaskScreenCallbacks
+import com.erics.tasklite.ui.expanded.ExpandedTaskScreenUiState
+import com.erics.tasklite.ui.expanded.ExpandedTasksViewModel
+import com.erics.tasklite.widget.TaskLiteLaunchMode
+import com.erics.tasklite.widget.TaskLiteLaunchStateStore
+
+private const val EXPANDED_TASKS_ROUTE = "expanded_tasks"
+
+@Composable
+fun TaskLiteApp(
+	repository: TaskRepository,
+	notificationEnabled: Boolean = false,
+	onNotificationToggleRequested: (Boolean) -> Unit = {}
+) {
+	val navController = rememberNavController()
+
+	Surface(
+		modifier = Modifier.fillMaxSize(),
+		color = MaterialTheme.colorScheme.background
+	) {
+		NavHost(
+			navController = navController,
+			startDestination = EXPANDED_TASKS_ROUTE
+		) {
+			composable(EXPANDED_TASKS_ROUTE) {
+				ExpandedTasksRoute(
+					repository = repository,
+					notificationEnabled = notificationEnabled,
+					onNotificationToggleRequested = onNotificationToggleRequested
+				)
+			}
+		}
+	}
+}
+
+@Composable
+private fun ExpandedTasksRoute(
+	repository: TaskRepository,
+	notificationEnabled: Boolean,
+	onNotificationToggleRequested: (Boolean) -> Unit
+) {
+	val viewModel: ExpandedTasksViewModel = viewModel(
+		factory = ExpandedTasksViewModel.factory(repository = repository)
+	)
+	val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
+	val launchMode = TaskLiteLaunchStateStore.launchMode.collectAsState().value
+	val listState = rememberLazyListState()
+	var hasAppliedInitialScroll by remember { mutableStateOf(false) }
+	val view = LocalView.current
+
+	LaunchedEffect(uiState.currentTask?.id, uiState.completedTasks.map { it.id }) {
+		if (hasAppliedInitialScroll || uiState.currentTask == null) {
+			return@LaunchedEffect
+		}
+
+		val initialIndex = (uiState.completedTasks.size - 2).coerceAtLeast(0)
+		listState.scrollToItem(index = initialIndex)
+		hasAppliedInitialScroll = true
+	}
+
+	LaunchedEffect(uiState.completionShiftToken) {
+		if (uiState.completionShiftToken == 0 || uiState.currentTask == null) {
+			return@LaunchedEffect
+		}
+
+		val targetIndex = (uiState.completedTasks.size - 2).coerceAtLeast(0)
+		listState.animateScrollToItem(index = targetIndex)
+	}
+
+	ExpandedTaskScreen(
+		state = uiState.toScreenState(
+			launchMode = launchMode,
+			notificationEnabled = notificationEnabled
+		),
+		callbacks = ExpandedTaskScreenCallbacks(
+			onTaskTextClick = viewModel::startEditingTask,
+			onTaskTextChange = { _, text -> viewModel.updateEditingTaskText(text) },
+			onTaskEditCommit = { viewModel.saveEditingTask() },
+			onTaskEditCancel = { viewModel.cancelEditingTask() },
+			onTaskCompleteClick = { taskId ->
+				if (uiState.activeTasks.any { it.id == taskId }) {
+					view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+				}
+				viewModel.toggleTaskCompletion(taskId)
+			},
+			onTaskDeleteRequest = viewModel::requestDeleteTask,
+			onConfirmDeleteTask = viewModel::confirmDeleteTask,
+			onDismissDeleteTask = viewModel::cancelDeleteTask,
+			onTaskReorderRequest = { fromIndex, toIndex ->
+				if (fromIndex in uiState.activeTasks.indices && toIndex in uiState.activeTasks.indices && fromIndex != toIndex) {
+					view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+					viewModel.moveActiveTask(fromIndex = fromIndex, toIndex = toIndex)
+				}
+			},
+			onNotificationToggleRequested = onNotificationToggleRequested,
+			onAddTaskTextChange = viewModel::updateNewTaskText,
+			onAddTaskSubmit = {
+				if (uiState.newTaskText.isNotBlank()) {
+					view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+				}
+				viewModel.submitNewTask()
+			},
+			onAddTaskFocusHandled = TaskLiteLaunchStateStore::consumeAddLaunch
+		),
+		listState = listState,
+		modifier = Modifier.fillMaxSize()
+	)
+}
+
+private fun com.erics.tasklite.ui.expanded.ExpandedTasksUiState.toScreenState(
+	launchMode: TaskLiteLaunchMode,
+	notificationEnabled: Boolean
+): ExpandedTaskScreenUiState {
+	return ExpandedTaskScreenUiState(
+		completedTasks = completedTasks.asReversed().map { task ->
+			task.toRowUiState(
+				isEditing = editingTask?.id == task.id,
+				editText = editingTaskText
+			)
+		},
+		currentTask = currentTask?.toRowUiState(
+			isCurrentTask = true,
+			isEditing = editingTask?.id == currentTask.id,
+			editText = editingTaskText,
+			isPendingCompletion = currentTask.id in pendingCompletionTaskIds
+		),
+		futureTasks = futureTasks.map { task ->
+			task.toRowUiState(
+				isEditing = editingTask?.id == task.id,
+				editText = editingTaskText,
+				isPendingCompletion = task.id in pendingCompletionTaskIds
+			)
+		},
+		activeTaskCount = activeTasks.size,
+		addTaskText = newTaskText,
+		notificationEnabled = notificationEnabled,
+		focusAddTaskInput = launchMode == TaskLiteLaunchMode.ADD,
+		showDeleteConfirmation = deleteTargetTask != null,
+		deleteConfirmationTask = deleteTargetTask?.toRowUiState(
+			isEditing = editingTask?.id == deleteTargetTask.id,
+			editText = editingTaskText
+		)
+	)
+}
+
+private fun com.erics.tasklite.ui.expanded.ExpandedTaskUiModel.toRowUiState(
+	isCurrentTask: Boolean = false,
+	isEditing: Boolean = false,
+	editText: String = text,
+	isPendingCompletion: Boolean = false
+): ExpandedTaskRowUiState {
+	return ExpandedTaskRowUiState(
+		id = id,
+		text = text,
+		isCompleted = isCompleted,
+		isPendingCompletion = isPendingCompletion,
+		isCurrentTask = isCurrentTask,
+		isEditing = isEditing,
+		editText = if (isEditing) editText else text
+	)
+}
