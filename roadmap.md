@@ -13,9 +13,12 @@ The goal is to reduce distraction by putting the task ahead of the app.
 - [x] Reordering implemented
 - [x] Widget implemented
 - [x] Persistent notification implemented
-- [ ] Haptics implemented
+- [x] Haptics implemented
 - [x] Empty-state personality prompts implemented
 - [x] Soft overload warning implemented
+- [x] Current Task external-open positioning stabilized
+- [x] Completion crash regression fixed
+- [x] Long-row drag offset regression fixed
 - [ ] Polish and QA pass complete
 
 ---
@@ -172,7 +175,7 @@ The goal is to reduce distraction by putting the task ahead of the app.
 - Catch rough edges
 
 ### Tasks
-- [ ] Add haptic feedback
+- [x] Add haptic feedback
 - [ ] Verify long text truncation in widget
 - [ ] Verify full text visibility in expanded view
 - [ ] Test empty state
@@ -257,11 +260,21 @@ The goal is to reduce distraction by putting the task ahead of the app.
   - Softened the post-complete list movement with active-section size animation so the upward shift reads more intentionally
   - QA feedback corrected the expanded-screen bottom spacing so the notification and overload cards no longer cover list rows
   - QA feedback corrected completed-task interaction scope so completed history rows stay read-only except for duplicate-via-bubble
-  - QA feedback corrected expanded-screen scroll behavior so initial open and post-complete motion keep the Current Task near the intended third-row position
+  - QA feedback corrected expanded-screen scroll behavior so initial open and post-complete motion keep the Current Task closer to the top and more consistent in view
+  - QA feedback upgraded active-task dragging from tiny handle-only swaps to a broader continuous long-press drag on the active row
+  - QA feedback corrected notification-open anchoring by treating each external open as a fresh launch for expanded-view positioning
+  - QA feedback reduced drag drift by basing reorder movement on measured row spacing instead of a fixed threshold
+  - Refactor landed: the expanded screen now renders completed tasks, active tasks, and footer cards as first-class lazy items, with active reorder keyed to row IDs instead of a grouped nested block
+  - Current Task launch anchoring now uses the real flat item index instead of the older completed-count heuristic
+  - Current Task launch positioning now passes device QA across widget and notification opens after the flat-list follow-up fixes
+  - Investigation note: launch anchoring now waits for a brief content settle window before scrolling, and active-row drag thresholds now use neighboring row heights instead of a single dragged-row threshold
+  - Regression follow-up: completion crash was caused by transient duplicate task IDs across active/completed lazy sections during the 300ms completion window; active rows now filter out pending-completion IDs before rendering
+  - Regression follow-up: long-row drag drift now uses center-based anchoring so the dragged row stays closer to the pointer even when crossing rows of different heights
+  - Haptics are now aligned to the product rules: strong for complete, light for add and reorder-start, and none for delete
 - Phase 6 progress this session:
   - Added a small empty-state prompt pool with chill, sassy, and motivational tones
   - Randomized the prompt selection while keeping the empty-state surface minimal and calm
   - Added a soft overload warning once the active list gets large, using the same tone family instead of introducing a new alert system
 - Next concrete implementation step:
-  - Start the final Phase 7 QA and polish pass
+  - Finish the final Phase 7 QA pass against the shipped widget, notification, reorder, and text-display behaviors
   - Keep the richer floating-gap reorder UX as a later polish follow-up, not a blocker for current phase work

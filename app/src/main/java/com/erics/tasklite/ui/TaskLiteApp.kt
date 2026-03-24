@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -27,6 +28,9 @@ import com.erics.tasklite.ui.expanded.ExpandedTaskScreenUiState
 import com.erics.tasklite.ui.expanded.ExpandedTasksViewModel
 import com.erics.tasklite.widget.TaskLiteLaunchMode
 import com.erics.tasklite.widget.TaskLiteLaunchStateStore
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 
 private const val EXPANDED_TASKS_ROUTE = "expanded_tasks"
 
@@ -68,27 +72,38 @@ private fun ExpandedTasksRoute(
 	)
 	val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
 	val launchMode = TaskLiteLaunchStateStore.launchMode.collectAsState().value
+	val launchNonce = TaskLiteLaunchStateStore.launchNonce.collectAsState().value
 	val listState = rememberLazyListState()
-	var hasAppliedInitialScroll by remember { mutableStateOf(false) }
+	var appliedLaunchNonce by remember { mutableStateOf(-1) }
 	val view = LocalView.current
 
-	LaunchedEffect(uiState.currentTask?.id, uiState.completedTasks.map { it.id }) {
-		if (hasAppliedInitialScroll || uiState.currentTask == null) {
+	LaunchedEffect(launchNonce, uiState.currentTaskFlatIndex, uiState.completedTasks.size) {
+		val currentTaskIndex = uiState.currentTaskFlatIndex ?: return@LaunchedEffect
+		if (appliedLaunchNonce == launchNonce) {
 			return@LaunchedEffect
 		}
 
-		val initialIndex = (uiState.completedTasks.size - 2).coerceAtLeast(0)
-		listState.scrollToItem(index = initialIndex)
-		hasAppliedInitialScroll = true
+		delay(100)
+		listState.awaitItemsAtLeast(currentTaskIndex)
+		listState.scrollCurrentTaskNearThirdRow(
+			currentTaskIndex = currentTaskIndex,
+			animated = false
+		)
+		appliedLaunchNonce = launchNonce
 	}
 
-	LaunchedEffect(uiState.completionShiftToken) {
-		if (uiState.completionShiftToken == 0 || uiState.currentTask == null) {
+	LaunchedEffect(uiState.completionShiftToken, uiState.currentTaskFlatIndex, uiState.completedTasks.size) {
+		val currentTaskIndex = uiState.currentTaskFlatIndex ?: return@LaunchedEffect
+		if (uiState.completionShiftToken == 0) {
 			return@LaunchedEffect
 		}
 
-		val targetIndex = (uiState.completedTasks.size - 2).coerceAtLeast(0)
-		listState.animateScrollToItem(index = targetIndex)
+		delay(100)
+		listState.awaitItemsAtLeast(currentTaskIndex)
+		listState.scrollCurrentTaskNearThirdRow(
+			currentTaskIndex = currentTaskIndex,
+			animated = true
+		)
 	}
 
 	ExpandedTaskScreen(
@@ -112,7 +127,6 @@ private fun ExpandedTasksRoute(
 			onDismissDeleteTask = viewModel::cancelDeleteTask,
 			onTaskReorderRequest = { fromIndex, toIndex ->
 				if (fromIndex in uiState.activeTasks.indices && toIndex in uiState.activeTasks.indices && fromIndex != toIndex) {
-					view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
 					viewModel.moveActiveTask(fromIndex = fromIndex, toIndex = toIndex)
 				}
 			},
@@ -155,6 +169,29 @@ private fun com.erics.tasklite.ui.expanded.ExpandedTasksUiState.toScreenState(
 				isPendingCompletion = task.id in pendingCompletionTaskIds
 			)
 		},
+		activeTasks = buildList {
+			currentTask?.let { current ->
+				add(
+					current.toRowUiState(
+						isCurrentTask = true,
+						isReorderable = true,
+						isEditing = editingTask?.id == current.id,
+						editText = editingTaskText,
+						isPendingCompletion = current.id in pendingCompletionTaskIds
+					)
+				)
+			}
+			futureTasks.forEach { task ->
+				add(
+					task.toRowUiState(
+						isReorderable = true,
+						isEditing = editingTask?.id == task.id,
+						editText = editingTaskText,
+						isPendingCompletion = task.id in pendingCompletionTaskIds
+					)
+				)
+			}
+		},
 		activeTaskCount = activeTasks.size,
 		addTaskText = newTaskText,
 		notificationEnabled = notificationEnabled,
@@ -169,6 +206,7 @@ private fun com.erics.tasklite.ui.expanded.ExpandedTasksUiState.toScreenState(
 
 private fun com.erics.tasklite.ui.expanded.ExpandedTaskUiModel.toRowUiState(
 	isCurrentTask: Boolean = false,
+	isReorderable: Boolean = false,
 	isEditing: Boolean = false,
 	editText: String = text,
 	isPendingCompletion: Boolean = false
@@ -179,7 +217,28 @@ private fun com.erics.tasklite.ui.expanded.ExpandedTaskUiModel.toRowUiState(
 		isCompleted = isCompleted,
 		isPendingCompletion = isPendingCompletion,
 		isCurrentTask = isCurrentTask,
+		isReorderable = isReorderable,
 		isEditing = isEditing,
 		editText = if (isEditing) editText else text
 	)
+}
+
+private suspend fun androidx.compose.foundation.lazy.LazyListState.awaitItemsAtLeast(targetIndex: Int) {
+	val requiredItemCount = (targetIndex + 1).coerceAtLeast(1)
+
+	snapshotFlow { layoutInfo.totalItemsCount }
+		.map { count -> count >= requiredItemCount }
+		.first { it }
+}
+
+private suspend fun androidx.compose.foundation.lazy.LazyListState.scrollCurrentTaskNearThirdRow(
+	currentTaskIndex: Int,
+	animated: Boolean
+) {
+	val targetIndex = (currentTaskIndex - 2).coerceAtLeast(0)
+	if (animated) {
+		animateScrollToItem(index = targetIndex)
+	} else {
+		scrollToItem(index = targetIndex)
+	}
 }

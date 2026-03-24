@@ -32,10 +32,15 @@ class ExpandedTasksViewModel(
 
 	private val taskSnapshot: StateFlow<TaskSnapshot> = combine(
 		incompleteTasks,
-		completedTasks
-	) { incomplete, completed ->
-		val activeTasks = incomplete.map(TaskEntity::toExpandedTaskUiModel)
+		completedTasks,
+		pendingCompletionTaskIds
+	) { incomplete, completed, pendingCompletionIds ->
 		val completedTaskModels = completed.map(TaskEntity::toExpandedTaskUiModel)
+		val blockedTaskIds = completedTaskModels.mapTo(mutableSetOf()) { it.id }
+		blockedTaskIds.addAll(pendingCompletionIds)
+		val activeTasks = incomplete
+			.map(TaskEntity::toExpandedTaskUiModel)
+			.filterNot { it.id in blockedTaskIds }
 
 		TaskSnapshot(
 			activeTasks = activeTasks,
@@ -90,6 +95,7 @@ class ExpandedTasksViewModel(
 			completedTasks = tasks.completedTasks,
 			currentTask = tasks.activeTasks.firstOrNull(),
 			futureTasks = tasks.activeTasks.drop(1),
+			currentTaskFlatIndex = tasks.activeTasks.firstOrNull()?.let { tasks.completedTasks.size },
 			isAddTaskFieldVisible = transient.isAddTaskFieldVisible,
 			newTaskText = transient.newTaskText,
 			editingTask = tasks.allTasks.firstOrNull { it.id == transient.editingTaskId },

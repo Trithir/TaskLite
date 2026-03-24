@@ -1,6 +1,6 @@
 package com.erics.tasklite.ui.expanded
 
-import androidx.compose.animation.animateContentSize
+import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -42,6 +41,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -49,16 +50,19 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import kotlin.math.roundToInt
 
 data class ExpandedTaskScreenUiState(
 	val completedTasks: List<ExpandedTaskRowUiState> = emptyList(),
 	val currentTask: ExpandedTaskRowUiState? = null,
 	val futureTasks: List<ExpandedTaskRowUiState> = emptyList(),
+	val activeTasks: List<ExpandedTaskRowUiState> = emptyList(),
 	val activeTaskCount: Int = 0,
 	val addTaskText: String = "",
 	val addTaskPlaceholder: String = "Add a task",
@@ -105,6 +109,7 @@ fun ExpandedTaskScreen(
 	val addTaskFocusRequester = remember { FocusRequester() }
 	var bottomControlsHeightPx by remember { mutableIntStateOf(0) }
 	val density = LocalDensity.current
+	val view = LocalView.current
 
 	LaunchedEffect(state.focusAddTaskInput) {
 		if (state.focusAddTaskInput) {
@@ -116,7 +121,9 @@ fun ExpandedTaskScreen(
 	Surface(
 		modifier = modifier.fillMaxSize()
 	) {
-		val activeTasks = rememberActiveTasks(state)
+		val activeTasks = state.activeTasks
+		val activeTaskById = remember(activeTasks) { activeTasks.associateBy { it.id } }
+		val reorderState = rememberReorderableActiveTaskRowsState(activeTasks)
 
 		Box(
 			modifier = Modifier.fillMaxSize()
@@ -134,7 +141,7 @@ fun ExpandedTaskScreen(
 			) {
 				items(
 					items = state.completedTasks,
-					key = { it.id }
+					key = { task -> "completed-${task.id}" }
 				) { task ->
 					ExpandedTaskRow(
 						task = task,
@@ -142,43 +149,51 @@ fun ExpandedTaskScreen(
 					)
 				}
 
-				if (activeTasks.isNotEmpty()) {
-					item {
-						ReorderableActiveTaskSection(
-							tasks = activeTasks,
-							callbacks = callbacks
+				items(
+					items = reorderState.orderedTaskIds,
+					key = { taskId -> "active-$taskId" }
+				) { taskId ->
+					activeTaskById[taskId]?.let { task ->
+						ReorderableActiveTaskRow(
+							task = task,
+							callbacks = callbacks,
+							reorderState = reorderState
 						)
 					}
 				}
 
 				if (
 					state.completedTasks.isEmpty() &&
-					state.currentTask == null &&
-					state.futureTasks.isEmpty()
+					activeTasks.isEmpty()
 				) {
 					item {
 						EmptyStateCard()
 					}
 				}
+
+				if (state.activeTaskCount >= SOFT_OVERLOAD_WARNING_THRESHOLD) {
+					item {
+						SoftOverloadWarningCard(
+							activeTaskCount = state.activeTaskCount
+						)
+					}
+				}
+
+				item {
+					NotificationToggleCard(
+						enabled = state.notificationEnabled,
+						onCheckedChange = callbacks.onNotificationToggleRequested
+					)
+				}
 			}
 
-			Column(
+			Box(
 				modifier = Modifier
 					.align(Alignment.BottomCenter)
 					.fillMaxWidth()
 					.padding(20.dp)
-					.onSizeChanged { bottomControlsHeightPx = it.height },
-				verticalArrangement = Arrangement.spacedBy(10.dp)
+					.onSizeChanged { bottomControlsHeightPx = it.height }
 			) {
-				SoftOverloadWarningCard(
-					activeTaskCount = state.activeTaskCount
-				)
-
-				NotificationToggleCard(
-					enabled = state.notificationEnabled,
-					onCheckedChange = callbacks.onNotificationToggleRequested
-				)
-
 				ExpandedTaskComposer(
 					text = state.addTaskText,
 					placeholder = state.addTaskPlaceholder,
@@ -186,7 +201,7 @@ fun ExpandedTaskScreen(
 					onSubmit = callbacks.onAddTaskSubmit,
 					focusRequester = addTaskFocusRequester
 				)
-			}
+			} 
 		}
 	}
 
@@ -200,108 +215,153 @@ fun ExpandedTaskScreen(
 }
 
 @Composable
-private fun rememberActiveTasks(state: ExpandedTaskScreenUiState): List<ExpandedTaskRowUiState> {
-	return remember(state.currentTask, state.futureTasks) {
-		buildList {
-			state.currentTask?.let { add(it.copy(isReorderable = true)) }
-			addAll(state.futureTasks.map { it.copy(isReorderable = true) })
+private fun rememberReorderableActiveTaskRowsState(tasks: List<ExpandedTaskRowUiState>): ReorderableActiveTaskRowsState {
+	val taskIds = tasks.map { it.id }
+	val state = remember { ReorderableActiveTaskRowsState(taskIds) }
+
+	LaunchedEffect(taskIds, state.draggingTaskId) {
+		if (state.draggingTaskId == null && state.orderedTaskIds != taskIds) {
+			state.orderedTaskIds = taskIds
 		}
 	}
+
+	return state
+}
+
+@Stable
+private class ReorderableActiveTaskRowsState(initialTaskIds: List<Long>) {
+	var orderedTaskIds by mutableStateOf(initialTaskIds)
+	var draggingTaskId by mutableStateOf<Long?>(null)
+	var dragDistanceY by mutableFloatStateOf(0f)
+	var dragStartCenterY by mutableFloatStateOf(0f)
+	val rowHeightsPx = mutableStateMapOf<Long, Float>()
 }
 
 @Composable
-private fun ReorderableActiveTaskSection(
-	tasks: List<ExpandedTaskRowUiState>,
-	callbacks: ExpandedTaskScreenCallbacks
+private fun ReorderableActiveTaskRow(
+	task: ExpandedTaskRowUiState,
+	callbacks: ExpandedTaskScreenCallbacks,
+	reorderState: ReorderableActiveTaskRowsState
 ) {
-	val taskById = remember(tasks) { tasks.associateBy { it.id } }
-	val taskIds = tasks.map { it.id }
-	var orderedTaskIds by remember { mutableStateOf(taskIds) }
-	var draggingTaskId by remember { mutableStateOf<Long?>(null) }
-	var dragOffsetY by remember { mutableFloatStateOf(0f) }
+	val density = LocalDensity.current
+	val view = LocalView.current
+	val fallbackStepPx = with(density) { 84.dp.toPx() }
+	val spacingPx = with(density) { 12.dp.toPx() }
 
-	LaunchedEffect(taskIds, draggingTaskId) {
-		if (draggingTaskId == null) {
-			orderedTaskIds = taskIds
-		}
-	}
+	val dragModifier = Modifier.pointerInput(task.id) {
+		detectDragGesturesAfterLongPress(
+			onDragStart = {
+				reorderState.draggingTaskId = task.id
+				reorderState.dragDistanceY = 0f
+				reorderState.dragStartCenterY = reorderState.orderedTaskIds.centerYOf(
+					taskId = task.id,
+					rowHeightsPx = reorderState.rowHeightsPx,
+					spacingPx = spacingPx,
+					fallbackStepPx = fallbackStepPx
+				)
+				view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+			},
+			onDragEnd = {
+				reorderState.draggingTaskId = null
+				reorderState.dragDistanceY = 0f
+				reorderState.dragStartCenterY = 0f
+			},
+			onDragCancel = {
+				reorderState.draggingTaskId = null
+				reorderState.dragDistanceY = 0f
+				reorderState.dragStartCenterY = 0f
+			}
+		) { _, dragAmount ->
+			if (reorderState.draggingTaskId != task.id) {
+				return@detectDragGesturesAfterLongPress
+			}
 
-	Column(
-		modifier = Modifier
-			.fillMaxWidth()
-			.animateContentSize(),
-		verticalArrangement = Arrangement.spacedBy(12.dp)
-	) {
-		orderedTaskIds.forEach { taskId ->
-			val task = taskById[taskId] ?: return@forEach
+			reorderState.dragDistanceY += dragAmount.y
+			val currentOrder = reorderState.orderedTaskIds.toMutableList()
+			val previousIndex = currentOrder.indexOf(task.id)
+			if (previousIndex == -1) {
+				return@detectDragGesturesAfterLongPress
+			}
 
-			ExpandedTaskRow(
-				task = task,
-				callbacks = callbacks,
-				modifier = Modifier
-					.offset {
-						if (draggingTaskId == taskId) {
-							IntOffset(0, dragOffsetY.roundToInt())
-						} else {
-							IntOffset.Zero
-						}
-					},
-				reorderHandleModifier = Modifier.pointerInput(taskId) {
-					detectDragGesturesAfterLongPress(
-						onDragStart = {
-							draggingTaskId = taskId
-							dragOffsetY = 0f
-						},
-						onDragEnd = {
-							draggingTaskId = null
-							dragOffsetY = 0f
-						},
-						onDragCancel = {
-							draggingTaskId = null
-							dragOffsetY = 0f
-						}
-					) { _, dragAmount ->
-						if (draggingTaskId != taskId) {
-							return@detectDragGesturesAfterLongPress
-						}
+			val draggedCenterY = reorderState.dragStartCenterY + reorderState.dragDistanceY
+			var currentIndex = previousIndex
+			var moved = false
 
-						dragOffsetY += dragAmount.y
-						val nextOrder = orderedTaskIds.toMutableList()
-						val previousIndex = nextOrder.indexOf(taskId)
-						var currentIndex = previousIndex
-						if (currentIndex == -1) {
-							return@detectDragGesturesAfterLongPress
-						}
+			while (currentIndex > 0) {
+				val aboveId = currentOrder[currentIndex - 1]
+				val aboveCenterY = currentOrder.centerYOf(
+					taskId = aboveId,
+					rowHeightsPx = reorderState.rowHeightsPx,
+					spacingPx = spacingPx,
+					fallbackStepPx = fallbackStepPx
+				)
 
-						var moved = false
-
-						while (currentIndex > 0 && dragOffsetY < -REORDER_SWAP_THRESHOLD_PX) {
-							nextOrder.swap(currentIndex, currentIndex - 1)
-							currentIndex -= 1
-							dragOffsetY += REORDER_SWAP_THRESHOLD_PX
-							moved = true
-						}
-
-						while (currentIndex < nextOrder.lastIndex && dragOffsetY > REORDER_SWAP_THRESHOLD_PX) {
-							nextOrder.swap(currentIndex, currentIndex + 1)
-							currentIndex += 1
-							dragOffsetY -= REORDER_SWAP_THRESHOLD_PX
-							moved = true
-						}
-
-						if (moved) {
-							val newIndex = currentIndex
-							orderedTaskIds = nextOrder
-							callbacks.onTaskReorderRequest(previousIndex, newIndex)
-						}
-					}
+				if (draggedCenterY >= aboveCenterY) {
+					break
 				}
-			)
+
+				currentOrder.swap(currentIndex, currentIndex - 1)
+				currentIndex -= 1
+				moved = true
+			}
+
+			while (currentIndex < currentOrder.lastIndex) {
+				val belowId = currentOrder[currentIndex + 1]
+				val belowCenterY = currentOrder.centerYOf(
+					taskId = belowId,
+					rowHeightsPx = reorderState.rowHeightsPx,
+					spacingPx = spacingPx,
+					fallbackStepPx = fallbackStepPx
+				)
+
+				if (draggedCenterY <= belowCenterY) {
+					break
+				}
+
+				currentOrder.swap(currentIndex, currentIndex + 1)
+				currentIndex += 1
+				moved = true
+			}
+
+			if (moved) {
+				reorderState.orderedTaskIds = currentOrder
+				callbacks.onTaskReorderRequest(previousIndex, currentIndex)
+			}
 		}
 	}
-}
 
-private const val REORDER_SWAP_THRESHOLD_PX = 72f
+	val dragTranslationY = if (reorderState.draggingTaskId != task.id) {
+		0f
+	} else {
+		val draggedCenterY = reorderState.dragStartCenterY + reorderState.dragDistanceY
+		val currentCenterY = reorderState.orderedTaskIds.centerYOf(
+			taskId = task.id,
+			rowHeightsPx = reorderState.rowHeightsPx,
+			spacingPx = spacingPx,
+			fallbackStepPx = fallbackStepPx
+		)
+		draggedCenterY - currentCenterY
+	}
+
+	ExpandedTaskRow(
+		task = task,
+		callbacks = callbacks,
+		modifier = Modifier
+			.then(dragModifier)
+			.onSizeChanged { rowSize ->
+				reorderState.rowHeightsPx[task.id] = rowSize.height.toFloat()
+			}
+			.offset {
+				if (reorderState.draggingTaskId == task.id) {
+					IntOffset(0, dragTranslationY.roundToInt())
+				} else {
+					IntOffset.Zero
+				}
+			}
+			.zIndex(if (reorderState.draggingTaskId == task.id) 1f else 0f),
+		reorderHandleModifier = Modifier
+	)
+}
 
 @Composable
 private fun ExpandedTaskRow(
@@ -318,7 +378,7 @@ private fun ExpandedTaskRow(
 		)
 	} else if (task.isCurrentTask) {
 		CardDefaults.cardColors(
-			containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+			containerColor = androidx.compose.material3.MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)
 		)
 	} else {
 		CardDefaults.cardColors()
@@ -329,7 +389,7 @@ private fun ExpandedTaskRow(
 		shape = RoundedCornerShape(24.dp),
 		colors = cardColors,
 		border = if (task.isCurrentTask) {
-			BorderStroke(1.dp, androidx.compose.material3.MaterialTheme.colorScheme.outlineVariant)
+			BorderStroke(1.dp, androidx.compose.material3.MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f))
 		} else null
 	) {
 		if (task.isEditing) {
@@ -714,10 +774,27 @@ private val SoftWarningPromptSaver = androidx.compose.runtime.saveable.listSaver
 	restore = { restored -> SoftWarningPrompt(title = restored[0], message = restored[1]) }
 )
 
-private const val SOFT_OVERLOAD_WARNING_THRESHOLD = 5
+private const val SOFT_OVERLOAD_WARNING_THRESHOLD = 50
 
 private fun <T> MutableList<T>.swap(firstIndex: Int, secondIndex: Int) {
 	val firstValue = this[firstIndex]
 	this[firstIndex] = this[secondIndex]
 	this[secondIndex] = firstValue
+}
+
+private fun List<Long>.centerYOf(
+	taskId: Long,
+	rowHeightsPx: Map<Long, Float>,
+	spacingPx: Float,
+	fallbackStepPx: Float
+): Float {
+	var topY = 0f
+	for (currentTaskId in this) {
+		val heightPx = rowHeightsPx[currentTaskId] ?: fallbackStepPx
+		if (currentTaskId == taskId) {
+			return topY + (heightPx / 2f)
+		}
+		topY += heightPx + spacingPx
+	}
+	return fallbackStepPx / 2f
 }
