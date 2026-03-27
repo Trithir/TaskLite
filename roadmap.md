@@ -290,4 +290,48 @@ The goal is to reduce distraction by putting the task ahead of the app.
   - Manager call: keep the remaining Phase 7 checklist focused on device/manual validation for widget, notification, relaunch, and visual text-behavior surfaces
 - QA update:
   - Latest user testing reports the app feels stable with no obvious bugs currently noticed
-  - Haptics have not been validated on a physical device yet, so that check remains intentionally parked until device install/testing is available
+  - Physical-device QA now confirms the in-app vibration patterns are working again, and widget completion vibration is also firing reliably
+  - First physical-device QA pass surfaced follow-ups around keyboard/composer positioning, text auto-capitalization, drag-handle ergonomics, widget density, notification icon polish, and missing haptics
+  - Follow-up implementation landed: the add-task composer now rides above the keyboard instead of shifting the full screen, task text fields request sentence capitalization, and drag now starts from the handle without a long-press
+  - Follow-up implementation landed: tapping open space now clears focus so the keyboard can dismiss when the user clicks away from the add-task composer
+  - Follow-up implementation landed: reorder now previews during drag but commits the move on release, so tasks do not feel like they are dropping early just by passing over another row
+  - Drag-session follow-up landed: the reorder handle gesture now stays keyed to the task ID instead of the moving task order, which keeps the drag alive across row swaps
+  - Follow-up implementation landed: active-task drag now gently auto-scrolls when the dragged row nears the top or bottom of the visible list
+  - Widget follow-up landed: the widget now uses a single centered pill-style bar layout with aggressive `4x1` sizing hints, slimmer controls, and a lighter translucent surface; launcher-side remove/re-add may still be required on hosts that cache widget sizing hints
+  - Follow-up implementation landed: notification small icon now uses a dedicated app asset instead of the generic system exclamation icon
+  - Feedback follow-up landed: TaskLite now uses vibration-first feedback with distinct intensities for add, move, edit, and complete, while keeping a small `View.performHapticFeedback` fallback only when direct vibration is unavailable
+  - Editor UX follow-up landed: selecting a task for inline edit now hides the add-task composer and scrolls the edited row upward so it stays visible above the keyboard on smaller screens
+  - Notification follow-up landed: the active notification now uses the current task text as the title so Android no longer shows the app name twice in the shade
+  - Visual refresh follow-up landed: the app and widget now share a deeper forest-green palette, lighter green task surfaces, a restrained current-task highlight, and warm complementary completion bubbles
+  - Manager review follow-up: helper-agent review caught and corrected the edit-row index math for inline edit scrolling and prevented the amber accent color from leaking into unrelated controls
+  - Release metadata follow-up: app package version advanced from `0.1.0` to `0.1.1`, with `versionCode` incremented to keep installs/upgrades monotonic on device
+  - Feedback follow-up landed: add, move, and edit now use the former completion vibration profile, while complete now uses a stronger two-part `buzz buzzzz` confirmation
+  - Widget investigation follow-up landed: two helper agents traced the visible background issue to the widget pill's full-width layout, and the widget now uses a single padded content row instead of overlapping full-width boxes
+  - Widget cleanup follow-up landed: old shrink-era overlap layout was removed so text/button sizing and pill padding now live in one place
+  - Drag polish follow-up landed: edge auto-scroll is softer and now respects the bottom composer height so the scroll trigger sits above the add-task bar instead of hiding underneath it
+  - QA polish follow-up landed: entering inline edit now focuses the selected task field directly and opens the keyboard so editing can start immediately
+  - QA polish follow-up landed: completion vibration now uses a more emphatic `buzz, pause, buzzzz` rhythm, while add, move, and edit reuse the former completion confirmation pattern
+  - QA polish follow-up landed: widget current-task text was bumped one more size step, and the top edge auto-scroll trigger was nudged slightly farther from the screen edge
+  - Widget feedback follow-up landed: completing the current task from the home-screen widget now triggers the same completion vibration profile as the in-app complete action
+  - Cleanup follow-up landed: the shared vibration helper now keeps the completion waveform in one named place instead of duplicating that effect inline across call paths
+  - Release metadata follow-up: app package version advanced from `0.1.1` to `0.1.2`, with `versionCode` incremented again so the latest build upgrades cleanly on device
+  - Widget UX follow-up landed: the widget pill itself now opens the app on tap while leaving the bubble actions intact, and the complete/add bubbles now mirror the same left-right arrangement used in the expanded list
+  - Feedback follow-up landed: the completion vibration timing was doubled so the `buzz, pause, buzzzz` pattern reads more clearly on-device
+  - Release metadata follow-up: app package version advanced from `0.1.2` to `0.1.3`, with `versionCode` incremented again for the new widget/feedback pass
+  - The old haptic-first approach is intentionally retired from the main path so the app’s tactile feedback now matches the requested vibration levels more closely
+  - Widget polish follow-up landed: incomplete completion bubbles now show a checkmark inside an outlined circle in both the expanded list and the widget, while completed/pending-complete bubbles fill in during the crossed-out state
+  - Keyboard follow-up landed: the expanded list now reserves both composer height and live IME inset so the bottom rows can still scroll fully into view while the keyboard is open, including the ongoing-notification card
+  - Widget haptics follow-up landed: widget completion now uses a more resilient vibrator lookup path that falls back from `VibratorManager` to the legacy vibrator service when needed
+  - Release metadata follow-up: app package version advanced from `0.1.3` to `0.1.4`, with `versionCode` incremented again for this widget/keyboard polish pass
+  - Regression follow-up landed: direct vibration now uses the simpler shared `vibrate(effect)` path again after the newer touch-usage attribute route caused haptics to go silent across app interactions on-device
+  - Widget visual follow-up landed: the idle widget completion bubble now blends into the pill background with a muted outline instead of reading as a yellow-highlighted filled control
+  - Widget haptics deep-dive follow-up landed: widget completion now uses a widget-only vibration path tuned for callback/background execution, while the list keeps the foreground-tuned helper that already works well on-device
+  - Widget polish follow-up landed: the widget completion state now lingers for 1 second with a filled bubble and struck-through task text before revealing the next task
+  - Release metadata follow-up: app package version advanced from `0.1.4` to `0.1.5`, with `versionCode` incremented again for this widget vibration investigation pass
+  - Widget double-complete follow-up landed: widget completion now serializes taps with an in-process action mutex so overlapping widget callbacks cannot race each other
+  - Widget stale-click follow-up landed: widget completion callbacks now carry the rendered task ID and will only complete that exact task, so queued stale taps cannot complete the next promoted task
+  - Widget cleanup follow-up landed: the temporary extra interaction-lock timing layer was removed after the task-ID validation fix made it redundant, leaving the widget completion path smaller and easier to reason about
+  - Release metadata follow-up: app package version advanced from `0.1.4` to `0.1.8`, with `versionCode` incremented through the widget vibration, double-tap, stale-click, and cleanup passes
+  - Current working QA signal: widget completion now vibrates, lingers for 1 second with the completed styling, and ignores stale second taps that previously completed the next task
+  - Launcher icon follow-up landed: TaskLite now sets explicit adaptive launcher icons in the manifest, using a completed-bubble foreground with a calm green background plus a monochrome variant for themed icons
+  - Notification icon follow-up landed: the status-bar icon now uses a minimal dot-list glyph instead of a completed checkmark so it reads more clearly as an active task list

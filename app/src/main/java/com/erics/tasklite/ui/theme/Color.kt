@@ -2,11 +2,12 @@ package com.erics.tasklite.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val NightInk = Color(0xFF111417)
-val Slate = Color(0xFF1A2126)
-val Fog = Color(0xFFE5E7EB)
-val Cloud = Color(0xFFB9C0C8)
-val Moss = Color(0xFF8FA889)
-val Sand = Color(0xFFD8C7A1)
-val Snow = Color(0xFFF7F4ED)
-val Ash = Color(0xFF20262C)
+val DeepForest = Color(0xFF0B1E17)
+val Pine = Color(0xFF143127)
+val MossSurface = Color(0xFF1B4032)
+val FernHighlight = Color(0xFF295744)
+val Mist = Color(0xFFE6F1EC)
+val Sage = Color(0xFFA4C0B4)
+val AmberDot = Color(0xFFE4B86A)
+val Cream = Color(0xFFF3F7F4)
+val Bark = Color(0xFF1A241F)

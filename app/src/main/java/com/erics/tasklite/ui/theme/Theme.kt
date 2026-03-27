@@ -4,25 +4,42 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 
 private val DarkColors = darkColorScheme(
-	primary = Sand,
-	onPrimary = NightInk,
-	background = NightInk,
-	onBackground = Fog,
-	surface = Slate,
-	onSurface = Fog,
-	onSurfaceVariant = Cloud
+	primary = AmberDot,
+	onPrimary = DeepForest,
+	primaryContainer = FernHighlight,
+	onPrimaryContainer = Mist,
+	secondary = Sage,
+	onSecondary = DeepForest,
+	secondaryContainer = FernHighlight,
+	onSecondaryContainer = Mist,
+	background = DeepForest,
+	onBackground = Mist,
+	surface = MossSurface,
+	onSurface = Mist,
+	surfaceVariant = Pine,
+	onSurfaceVariant = Sage,
+	outlineVariant = Sage.copy(alpha = 0.38f)
 )
 
 private val LightColors = lightColorScheme(
-	primary = Moss,
-	onPrimary = Snow,
-	background = Snow,
-	onBackground = Ash,
+	primary = AmberDot,
+	onPrimary = DeepForest,
+	primaryContainer = ColorTokens.LightPrimaryContainer,
+	onPrimaryContainer = Bark,
+	secondary = FernHighlight,
+	onSecondary = Cream,
+	secondaryContainer = ColorTokens.LightSecondaryContainer,
+	onSecondaryContainer = Bark,
+	background = Cream,
+	onBackground = Bark,
 	surface = ColorTokens.LightSurface,
-	onSurface = Ash,
-	onSurfaceVariant = ColorTokens.LightMuted
+	onSurface = Bark,
+	surfaceVariant = ColorTokens.LightSecondaryContainer,
+	onSurfaceVariant = ColorTokens.LightMuted,
+	outlineVariant = FernHighlight.copy(alpha = 0.22f)
 )
 
 @Composable
@@ -40,6 +57,8 @@ fun TaskLiteTheme(
 }
 
 private object ColorTokens {
-	val LightSurface = Snow
-	val LightMuted = Ash.copy(alpha = 0.7f)
+	val LightPrimaryContainer = Color(0xFFD3E6D8)
+	val LightSecondaryContainer = Color(0xFFD9EADF)
+	val LightSurface = Color(0xFFEAF3EE)
+	val LightMuted = Bark.copy(alpha = 0.7f)
 }

@@ -1,12 +1,12 @@
 package com.erics.tasklite.ui
 
-import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -77,6 +77,10 @@ private fun ExpandedTasksRoute(
 	var appliedLaunchNonce by remember { mutableStateOf(-1) }
 	val view = LocalView.current
 
+	SideEffect {
+		view.isHapticFeedbackEnabled = true
+	}
+
 	LaunchedEffect(launchNonce, uiState.currentTaskFlatIndex, uiState.completedTasks.size) {
 		val currentTaskIndex = uiState.currentTaskFlatIndex ?: return@LaunchedEffect
 		if (appliedLaunchNonce == launchNonce) {
@@ -106,6 +110,13 @@ private fun ExpandedTasksRoute(
 		)
 	}
 
+	LaunchedEffect(uiState.editingTask?.id, uiState.editingTaskFlatIndex) {
+		val editingTaskIndex = uiState.editingTaskFlatIndex ?: return@LaunchedEffect
+		delay(150)
+		listState.awaitItemsAtLeast(editingTaskIndex)
+		listState.scrollEditingTaskIntoView(editingTaskIndex)
+	}
+
 	ExpandedTaskScreen(
 		state = uiState.toScreenState(
 			launchMode = launchMode,
@@ -114,11 +125,28 @@ private fun ExpandedTasksRoute(
 		callbacks = ExpandedTaskScreenCallbacks(
 			onTaskTextClick = viewModel::startEditingTask,
 			onTaskTextChange = { _, text -> viewModel.updateEditingTaskText(text) },
-			onTaskEditCommit = { viewModel.saveEditingTask() },
+			onTaskEditCommit = {
+				val editingTask = uiState.editingTask
+				val editingText = uiState.editingTaskText.trim()
+				val shouldVibrateOnEditCommit =
+					editingTask != null &&
+					editingText.isNotEmpty() &&
+					editingTask.text != editingText
+				viewModel.saveEditingTask()
+				if (shouldVibrateOnEditCommit) {
+					performEditTaskVibration(
+						context = view.context,
+						fallbackView = view
+					)
+				}
+			},
 			onTaskEditCancel = { viewModel.cancelEditingTask() },
 			onTaskCompleteClick = { taskId ->
 				if (uiState.activeTasks.any { it.id == taskId }) {
-					view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+					performCompleteTaskVibration(
+						context = view.context,
+						fallbackView = view
+					)
 				}
 				viewModel.toggleTaskCompletion(taskId)
 			},
@@ -128,13 +156,20 @@ private fun ExpandedTasksRoute(
 			onTaskReorderRequest = { fromIndex, toIndex ->
 				if (fromIndex in uiState.activeTasks.indices && toIndex in uiState.activeTasks.indices && fromIndex != toIndex) {
 					viewModel.moveActiveTask(fromIndex = fromIndex, toIndex = toIndex)
+					performMoveTaskVibration(
+						context = view.context,
+						fallbackView = view
+					)
 				}
 			},
 			onNotificationToggleRequested = onNotificationToggleRequested,
 			onAddTaskTextChange = viewModel::updateNewTaskText,
 			onAddTaskSubmit = {
 				if (uiState.newTaskText.isNotBlank()) {
-					view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+					performAddTaskVibration(
+						context = view.context,
+						fallbackView = view
+					)
 				}
 				viewModel.submitNewTask()
 			},
@@ -196,6 +231,7 @@ private fun com.erics.tasklite.ui.expanded.ExpandedTasksUiState.toScreenState(
 		addTaskText = newTaskText,
 		notificationEnabled = notificationEnabled,
 		focusAddTaskInput = launchMode == TaskLiteLaunchMode.ADD,
+		showAddTaskComposer = editingTask == null,
 		showDeleteConfirmation = deleteTargetTask != null,
 		deleteConfirmationTask = deleteTargetTask?.toRowUiState(
 			isEditing = editingTask?.id == deleteTargetTask.id,
@@ -241,4 +277,11 @@ private suspend fun androidx.compose.foundation.lazy.LazyListState.scrollCurrent
 	} else {
 		scrollToItem(index = targetIndex)
 	}
+}
+
+private suspend fun androidx.compose.foundation.lazy.LazyListState.scrollEditingTaskIntoView(
+	editingTaskIndex: Int
+) {
+	val targetIndex = (editingTaskIndex - 1).coerceAtLeast(0)
+	animateScrollToItem(index = targetIndex)
 }

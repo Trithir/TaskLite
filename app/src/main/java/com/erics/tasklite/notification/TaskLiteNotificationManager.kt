@@ -54,9 +54,8 @@ object TaskLiteNotificationManager {
 		ensureChannel(context)
 
 		val notification = NotificationCompat.Builder(context, TaskLiteNotificationIds.CHANNEL_ID)
-			.setSmallIcon(android.R.drawable.ic_dialog_info)
-			.setContentTitle(context.getString(R.string.app_name))
-			.setContentText(currentTaskText ?: "No current task")
+			.setSmallIcon(R.drawable.ic_notification_tasklite)
+			.setContentTitle(currentTaskText ?: "No current task")
 			.setContentIntent(
 				PendingIntent.getActivity(
 					context,
@@ -70,6 +69,7 @@ object TaskLiteNotificationManager {
 			.setSilent(true)
 			.setCategory(NotificationCompat.CATEGORY_STATUS)
 			.setPriority(NotificationCompat.PRIORITY_LOW)
+			.setShowWhen(false)
 			.build()
 
 		NotificationManagerCompat.from(context).notify(TaskLiteNotificationIds.NOTIFICATION_ID, notification)

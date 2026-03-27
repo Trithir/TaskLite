@@ -96,6 +96,9 @@ class ExpandedTasksViewModel(
 			currentTask = tasks.activeTasks.firstOrNull(),
 			futureTasks = tasks.activeTasks.drop(1),
 			currentTaskFlatIndex = tasks.activeTasks.firstOrNull()?.let { tasks.completedTasks.size },
+			editingTaskFlatIndex = tasks.activeTasks.indexOfFirst { it.id == transient.editingTaskId }
+				.takeIf { it >= 0 }
+				?.let { activeIndex -> tasks.completedTasks.size + activeIndex },
 			isAddTaskFieldVisible = transient.isAddTaskFieldVisible,
 			newTaskText = transient.newTaskText,
 			editingTask = tasks.allTasks.firstOrNull { it.id == transient.editingTaskId },
