@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -32,6 +33,7 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -79,6 +81,7 @@ data class ExpandedTaskScreenUiState(
 	val futureTasks: List<ExpandedTaskRowUiState> = emptyList(),
 	val activeTasks: List<ExpandedTaskRowUiState> = emptyList(),
 	val activeTaskCount: Int = 0,
+	val searchQuery: String = "",
 	val addTaskText: String = "",
 	val addTaskPlaceholder: String = "Add a task",
 	val notificationEnabled: Boolean = false,
@@ -99,6 +102,7 @@ data class ExpandedTaskScreenCallbacks(
 	val onDismissDeleteTask: () -> Unit,
 	val onTaskReorderRequest: (Int, Int) -> Unit = { _, _ -> },
 	val onNotificationToggleRequested: (Boolean) -> Unit = {},
+	val onSearchQueryChange: (String) -> Unit = {},
 	val onAddTaskTextChange: (String) -> Unit,
 	val onAddTaskSubmit: () -> Unit,
 	val onAddTaskFocusHandled: () -> Unit = {}
@@ -125,6 +129,7 @@ fun ExpandedTaskScreen(
 	val addTaskFocusRequester = remember { FocusRequester() }
 	var bottomControlsHeightPx by remember { mutableIntStateOf(0) }
 	val density = LocalDensity.current
+	val topInsetPx = WindowInsets.statusBars.getTop(density)
 	val bottomInsetPx = WindowInsets.navigationBars.getBottom(density)
 	val focusManager = LocalFocusManager.current
 	val backgroundInteractionSource = remember { MutableInteractionSource() }
@@ -160,7 +165,7 @@ fun ExpandedTaskScreen(
 					.imePadding(),
 				contentPadding = androidx.compose.foundation.layout.PaddingValues(
 					start = 20.dp,
-					top = 20.dp,
+					top = with(density) { topInsetPx.toDp() } + 12.dp,
 					end = 20.dp,
 					bottom = with(density) {
 						bottomControlsHeightPx.toDp() + bottomInsetPx.toDp()
@@ -168,6 +173,13 @@ fun ExpandedTaskScreen(
 				),
 				verticalArrangement = Arrangement.spacedBy(12.dp)
 			) {
+				item(key = "search-composer") {
+					SearchTaskComposer(
+						text = state.searchQuery,
+						onTextChange = callbacks.onSearchQueryChange
+					)
+				}
+
 				items(
 					items = state.completedTasks,
 					key = { task -> "completed-${task.id}" }
@@ -188,17 +200,19 @@ fun ExpandedTaskScreen(
 							callbacks = callbacks,
 							reorderState = reorderState,
 							listState = listState,
-							bottomOverlayHeightPx = bottomControlsHeightPx.toFloat()
+							bottomOverlayHeightPx = bottomControlsHeightPx.toFloat(),
+							reorderEnabled = state.searchQuery.isBlank()
 						)
 					}
 				}
 
-				if (
-					state.completedTasks.isEmpty() &&
-					activeTasks.isEmpty()
-				) {
+				if (state.completedTasks.isEmpty() && activeTasks.isEmpty()) {
 					item {
-						EmptyStateCard()
+						if (state.searchQuery.isBlank()) {
+							EmptyStateCard()
+						} else {
+							SearchEmptyStateCard()
+						}
 					}
 				}
 
@@ -287,7 +301,8 @@ private fun ReorderableActiveTaskRow(
 	callbacks: ExpandedTaskScreenCallbacks,
 	reorderState: ReorderableActiveTaskRowsState,
 	listState: LazyListState,
-	bottomOverlayHeightPx: Float
+	bottomOverlayHeightPx: Float,
+	reorderEnabled: Boolean
 ) {
 	val density = LocalDensity.current
 	val coroutineScope = rememberCoroutineScope()
@@ -296,7 +311,8 @@ private fun ReorderableActiveTaskRow(
 	val edgeAutoScrollThresholdPx = with(density) { 76.dp.toPx() }
 	val edgeAutoScrollStepPx = with(density) { 10.dp.toPx() }
 
-	val dragHandleModifier = Modifier.pointerInput(task.id) {
+	val dragHandleModifier = if (reorderEnabled) {
+		Modifier.pointerInput(task.id) {
 		detectDragGestures(
 			onDragStart = {
 				reorderState.draggingTaskId = task.id
@@ -410,9 +426,12 @@ private fun ReorderableActiveTaskRow(
 				}
 			}
 		}
+		}
+	} else {
+		Modifier
 	}
 
-	val dragTranslationY = if (reorderState.draggingTaskId != task.id) {
+	val dragTranslationY = if (!reorderEnabled || reorderState.draggingTaskId != task.id) {
 		0f
 	} else {
 		val draggedCenterY = reorderState.dragStartCenterY + reorderState.dragDistanceY
@@ -428,6 +447,7 @@ private fun ReorderableActiveTaskRow(
 	ExpandedTaskRow(
 		task = task,
 		callbacks = callbacks,
+		showReorderHandle = reorderEnabled,
 		modifier = Modifier
 			.onSizeChanged { rowSize ->
 				reorderState.rowHeightsPx[task.id] = rowSize.height.toFloat()
@@ -448,6 +468,7 @@ private fun ReorderableActiveTaskRow(
 private fun ExpandedTaskRow(
 	task: ExpandedTaskRowUiState,
 	callbacks: ExpandedTaskScreenCallbacks,
+	showReorderHandle: Boolean = true,
 	reorderHandleModifier: Modifier = Modifier,
 	modifier: Modifier = Modifier
 ) {
@@ -484,6 +505,7 @@ private fun ExpandedTaskRow(
 			DisplayTaskRow(
 				task = task,
 				callbacks = callbacks,
+				showReorderHandle = showReorderHandle,
 				reorderHandleModifier = reorderHandleModifier
 			)
 		}
@@ -494,6 +516,7 @@ private fun ExpandedTaskRow(
 private fun DisplayTaskRow(
 	task: ExpandedTaskRowUiState,
 	callbacks: ExpandedTaskScreenCallbacks,
+	showReorderHandle: Boolean = true,
 	reorderHandleModifier: Modifier = Modifier
 ) {
 	val isVisuallyCompleted = task.isCompleted || task.isPendingCompletion
@@ -531,7 +554,7 @@ private fun DisplayTaskRow(
 			textDecoration = if (isVisuallyCompleted) TextDecoration.LineThrough else null
 		)
 
-		if (task.isReorderable) {
+		if (task.isReorderable && showReorderHandle) {
 			Spacer(modifier = Modifier.width(8.dp))
 			ReorderHandle(
 				modifier = reorderHandleModifier
@@ -715,6 +738,64 @@ private fun ExpandedTaskComposer(
 				)
 			)
 		}
+	}
+}
+
+@Composable
+private fun SearchTaskComposer(
+	text: String,
+	onTextChange: (String) -> Unit,
+	modifier: Modifier = Modifier
+) {
+	Surface(
+		modifier = modifier.fillMaxWidth(),
+		shape = RoundedCornerShape(28.dp),
+		color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+	) {
+		OutlinedTextField(
+			value = text,
+			onValueChange = onTextChange,
+			modifier = Modifier.fillMaxWidth(),
+			shape = RoundedCornerShape(28.dp),
+			placeholder = {
+				Text(text = "Search")
+			},
+			trailingIcon = {
+				if (text.isNotEmpty()) {
+					IconButton(onClick = { onTextChange("") }) {
+						Text(
+							text = "x",
+							style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
+							color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+						)
+					}
+				}
+			},
+			singleLine = true,
+			colors = TextFieldDefaults.colors(
+				focusedContainerColor = Color.Transparent,
+				unfocusedContainerColor = Color.Transparent,
+				disabledContainerColor = Color.Transparent
+			)
+		)
+	}
+}
+
+@Composable
+private fun SearchEmptyStateCard() {
+	Card(
+		modifier = Modifier.fillMaxWidth(),
+		shape = RoundedCornerShape(22.dp),
+		colors = CardDefaults.cardColors(
+			containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+		)
+	) {
+		Text(
+			text = "No matching tasks.",
+			modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
+			style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+			color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+		)
 	}
 }
 

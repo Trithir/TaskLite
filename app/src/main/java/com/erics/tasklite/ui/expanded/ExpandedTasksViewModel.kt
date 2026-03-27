@@ -24,6 +24,7 @@ class ExpandedTasksViewModel(
 
 	private val isAddTaskFieldVisible = MutableStateFlow(false)
 	private val newTaskText = MutableStateFlow("")
+	private val searchQuery = MutableStateFlow("")
 	private val editingTaskId = MutableStateFlow<Long?>(null)
 	private val editingTaskText = MutableStateFlow("")
 	private val deleteTargetTaskId = MutableStateFlow<Long?>(null)
@@ -52,16 +53,32 @@ class ExpandedTasksViewModel(
 		TaskSnapshot()
 	)
 
-	private val baseTransientState: StateFlow<TransientTaskState> = combine(
+	private val draftState: StateFlow<DraftTaskState> = combine(
 		isAddTaskFieldVisible,
 		newTaskText,
+		searchQuery
+	) { isAddVisible, draftText, searchText ->
+		DraftTaskState(
+			isAddTaskFieldVisible = isAddVisible,
+			newTaskText = draftText,
+			searchQuery = searchText
+		)
+	}.stateIn(
+		viewModelScope,
+		SharingStarted.WhileSubscribed(5_000),
+		DraftTaskState()
+	)
+
+	private val baseTransientState: StateFlow<TransientTaskState> = combine(
+		draftState,
 		editingTaskId,
 		editingTaskText,
 		deleteTargetTaskId
-	) { isAddVisible, draftText, editingId, editingDraft, deleteTargetId ->
+	) { draftState, editingId, editingDraft, deleteTargetId ->
 		TransientTaskState(
-			isAddTaskFieldVisible = isAddVisible,
-			newTaskText = draftText,
+			isAddTaskFieldVisible = draftState.isAddTaskFieldVisible,
+			newTaskText = draftState.newTaskText,
+			searchQuery = draftState.searchQuery,
 			editingTaskId = editingId,
 			editingTaskText = editingDraft,
 			deleteTargetTaskId = deleteTargetId
@@ -91,14 +108,19 @@ class ExpandedTasksViewModel(
 		taskSnapshot,
 		transientState
 	) { tasks, transient ->
+		val filteredTasks = tasks.filteredBySearch(transient.searchQuery)
+		val completedTaskCount = filteredTasks.completedTasks.size
+		val currentTask = filteredTasks.activeTasks.firstOrNull()
+
 		ExpandedTasksUiState(
-			completedTasks = tasks.completedTasks,
-			currentTask = tasks.activeTasks.firstOrNull(),
-			futureTasks = tasks.activeTasks.drop(1),
-			currentTaskFlatIndex = tasks.activeTasks.firstOrNull()?.let { tasks.completedTasks.size },
-			editingTaskFlatIndex = tasks.activeTasks.indexOfFirst { it.id == transient.editingTaskId }
+			completedTasks = filteredTasks.completedTasks,
+			currentTask = currentTask,
+			futureTasks = filteredTasks.activeTasks.drop(1),
+			searchQuery = transient.searchQuery,
+			currentTaskFlatIndex = currentTask?.let { completedTaskCount + SEARCH_ITEM_COUNT },
+			editingTaskFlatIndex = filteredTasks.allTasks.indexOfFirst { it.id == transient.editingTaskId }
 				.takeIf { it >= 0 }
-				?.let { activeIndex -> tasks.completedTasks.size + activeIndex },
+				?.let { taskIndex -> SEARCH_ITEM_COUNT + taskIndex },
 			isAddTaskFieldVisible = transient.isAddTaskFieldVisible,
 			newTaskText = transient.newTaskText,
 			editingTask = tasks.allTasks.firstOrNull { it.id == transient.editingTaskId },
@@ -119,6 +141,10 @@ class ExpandedTasksViewModel(
 
 	fun updateNewTaskText(text: String) {
 		newTaskText.value = text
+	}
+
+	fun updateSearchQuery(text: String) {
+		searchQuery.value = text
 	}
 
 	fun cancelNewTask() {
@@ -302,6 +328,7 @@ class ExpandedTasksViewModel(
 
 	companion object {
 		private const val COMPLETION_SHIFT_DELAY_MS = 300L
+		private const val SEARCH_ITEM_COUNT = 1
 
 		fun factory(
 			repository: TaskRepository
@@ -323,14 +350,37 @@ private data class TaskSnapshot(
 ) {
 	val allTasks: List<ExpandedTaskUiModel>
 		get() = activeTasks + completedTasks
+
+	fun filteredBySearch(query: String): TaskSnapshot {
+		val normalizedQuery = query.trim()
+		if (normalizedQuery.isEmpty()) {
+			return this
+		}
+
+		return TaskSnapshot(
+			activeTasks = activeTasks.filter { it.matchesSearch(normalizedQuery) },
+			completedTasks = completedTasks.filter { it.matchesSearch(normalizedQuery) }
+		)
+	}
 }
 
 private data class TransientTaskState(
 	val isAddTaskFieldVisible: Boolean = false,
 	val newTaskText: String = "",
+	val searchQuery: String = "",
 	val editingTaskId: Long? = null,
 	val editingTaskText: String = "",
 	val deleteTargetTaskId: Long? = null,
 	val pendingCompletionTaskIds: Set<Long> = emptySet(),
 	val completionShiftToken: Int = 0
 )
+
+private data class DraftTaskState(
+	val isAddTaskFieldVisible: Boolean = false,
+	val newTaskText: String = "",
+	val searchQuery: String = ""
+)
+
+private fun ExpandedTaskUiModel.matchesSearch(query: String): Boolean {
+	return text.contains(query, ignoreCase = true)
+}

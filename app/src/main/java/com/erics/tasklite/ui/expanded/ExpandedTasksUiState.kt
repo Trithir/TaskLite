@@ -4,6 +4,7 @@ data class ExpandedTasksUiState(
 	val completedTasks: List<ExpandedTaskUiModel> = emptyList(),
 	val currentTask: ExpandedTaskUiModel? = null,
 	val futureTasks: List<ExpandedTaskUiModel> = emptyList(),
+	val searchQuery: String = "",
 	val currentTaskFlatIndex: Int? = null,
 	val editingTaskFlatIndex: Int? = null,
 	val isAddTaskFieldVisible: Boolean = false,

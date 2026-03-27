@@ -176,21 +176,23 @@ The goal is to reduce distraction by putting the task ahead of the app.
 
 ### Tasks
 - [x] Add haptic feedback
-- [ ] Verify long text truncation in widget
-- [ ] Verify full text visibility in expanded view
-- [ ] Test empty state
-- [ ] Test very long lists
-- [ ] Test delete confirmation flow
-- [ ] Test reorder behavior thoroughly
-- [ ] Test widget refresh behavior
-- [ ] Test app relaunch persistence
-- [ ] Test notification behavior
+- [x] Verify long text truncation in widget
+- [x] Verify full text visibility in expanded view
+- [x] Test empty state
+- [x] Test live search filtering in expanded view
+- [x] Test very long lists
+- [x] Test delete confirmation flow
+- [x] Test reorder behavior thoroughly
+- [x] Test widget refresh behavior
+- [x] Test app relaunch persistence
+- [x] Test notification behavior
 
 ### Notes
 - Core task-transition regression coverage now exists in local unit tests for add-at-bottom, delete confirmation, reorder priority updates, uncheck-to-duplicate, and the 300ms completion pause before promotion.
 - Manual/device QA is still required for widget truncation, full expanded-text visibility, widget refresh behavior, notification behavior, and relaunch persistence because those depend on Compose/Glance/system surfaces that are not fully exercised by the current unit-test layer.
 - Current manual QA signal is positive: the app appears stable in desktop/emulator testing with no obvious user-visible bugs reported so far.
 - Remaining device-specific validation is mainly haptics, which is intentionally deferred until the app is available on physical hardware.
+- Search now lives in a simple always-visible top composer in the expanded view, with live case-insensitive filtering across active and completed tasks; reorder is intentionally disabled while a search query is active to keep filtered drag behavior boring and predictable.
 
 ---
 
@@ -209,9 +211,9 @@ The goal is to reduce distraction by putting the task ahead of the app.
 ---
 
 ## Open questions
-- [ ] Whether to show remaining task count in widget later
-- [ ] Whether to add search when lists get very long
-- [ ] Whether delete confirmation should be a dialog or bottom sheet
+- [x] Whether to show remaining task count in widget later
+- [x] Whether to add search when lists get very long
+- [x] Whether delete confirmation should be a dialog or bottom sheet
 
 ---
 

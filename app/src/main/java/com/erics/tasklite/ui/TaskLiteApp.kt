@@ -163,6 +163,7 @@ private fun ExpandedTasksRoute(
 				}
 			},
 			onNotificationToggleRequested = onNotificationToggleRequested,
+			onSearchQueryChange = viewModel::updateSearchQuery,
 			onAddTaskTextChange = viewModel::updateNewTaskText,
 			onAddTaskSubmit = {
 				if (uiState.newTaskText.isNotBlank()) {
@@ -228,6 +229,7 @@ private fun com.erics.tasklite.ui.expanded.ExpandedTasksUiState.toScreenState(
 			}
 		},
 		activeTaskCount = activeTasks.size,
+		searchQuery = searchQuery,
 		addTaskText = newTaskText,
 		notificationEnabled = notificationEnabled,
 		focusAddTaskInput = launchMode == TaskLiteLaunchMode.ADD,

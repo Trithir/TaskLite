@@ -171,6 +171,49 @@ class ExpandedTasksViewModelTest {
 		assertEquals("Bottom", viewModel.uiState.value.currentTask?.text)
 	}
 
+	@Test
+	fun updateSearchQuery_filtersVisibleTasks_caseInsensitively() = runTest(dispatcher) {
+		val repository = FakeTaskRepository(
+			listOf(
+				TaskEntity(id = 1L, text = "Alpha current", sortOrder = 0L),
+				TaskEntity(id = 2L, text = "Bravo later", sortOrder = 1L),
+				TaskEntity(id = 3L, text = "done ALPHA", sortOrder = 2L, completedAt = 100L)
+			)
+		)
+		val viewModel = createViewModel(repository)
+		collectUiState(viewModel)
+		advanceUntilIdle()
+
+		viewModel.updateSearchQuery("alpha")
+		advanceUntilIdle()
+
+		assertEquals("alpha", viewModel.uiState.value.searchQuery)
+		assertEquals("Alpha current", viewModel.uiState.value.currentTask?.text)
+		assertEquals(emptyList<ExpandedTaskUiModel>(), viewModel.uiState.value.futureTasks)
+		assertEquals(listOf("done ALPHA"), viewModel.uiState.value.completedTasks.map(ExpandedTaskUiModel::text))
+	}
+
+	@Test
+	fun updateSearchQuery_hidesNonMatchingCurrentTask_whenThereAreNoMatches() = runTest(dispatcher) {
+		val repository = FakeTaskRepository(
+			listOf(
+				TaskEntity(id = 1L, text = "Current", sortOrder = 0L),
+				TaskEntity(id = 2L, text = "Later", sortOrder = 1L)
+			)
+		)
+		val viewModel = createViewModel(repository)
+		collectUiState(viewModel)
+		advanceUntilIdle()
+
+		viewModel.updateSearchQuery("zzz")
+		advanceUntilIdle()
+
+		assertNull(viewModel.uiState.value.currentTask)
+		assertTrue(viewModel.uiState.value.futureTasks.isEmpty())
+		assertTrue(viewModel.uiState.value.completedTasks.isEmpty())
+		assertNull(viewModel.uiState.value.currentTaskFlatIndex)
+	}
+
 	private fun createViewModel(repository: FakeTaskRepository): ExpandedTasksViewModel {
 		return ExpandedTasksViewModel(repository)
 	}
