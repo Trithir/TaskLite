@@ -118,16 +118,19 @@ class ExpandedTasksViewModel(
 			futureTasks = filteredTasks.activeTasks.drop(1),
 			searchQuery = transient.searchQuery,
 			currentTaskFlatIndex = currentTask?.let { completedTaskCount + SEARCH_ITEM_COUNT },
-			editingTaskFlatIndex = filteredTasks.allTasks.indexOfFirst { it.id == transient.editingTaskId }
+			editingTaskFlatIndex = filteredTasks.activeTasks.indexOfFirst { it.id == transient.editingTaskId }
 				.takeIf { it >= 0 }
-				?.let { taskIndex -> SEARCH_ITEM_COUNT + taskIndex },
+				?.let { activeTaskIndex ->
+					SEARCH_ITEM_COUNT + completedTaskCount + activeTaskIndex
+				},
 			isAddTaskFieldVisible = transient.isAddTaskFieldVisible,
 			newTaskText = transient.newTaskText,
 			editingTask = tasks.allTasks.firstOrNull { it.id == transient.editingTaskId },
 			editingTaskText = transient.editingTaskText,
 			deleteTargetTask = tasks.allTasks.firstOrNull { it.id == transient.deleteTargetTaskId },
 			pendingCompletionTaskIds = transient.pendingCompletionTaskIds,
-			completionShiftToken = transient.completionShiftToken
+			completionShiftToken = transient.completionShiftToken,
+			isEditingTask = transient.editingTaskId != null
 		)
 	}.stateIn(
 		viewModelScope,

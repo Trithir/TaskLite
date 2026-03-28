@@ -337,3 +337,5 @@ The goal is to reduce distraction by putting the task ahead of the app.
   - Current working QA signal: widget completion now vibrates, lingers for 1 second with the completed styling, and ignores stale second taps that previously completed the next task
   - Launcher icon follow-up landed: TaskLite now sets explicit adaptive launcher icons in the manifest, using a completed-bubble foreground with a calm green background plus a monochrome variant for themed icons
   - Notification icon follow-up landed: the status-bar icon now uses a minimal dot-list glyph instead of a completed checkmark so it reads more clearly as an active task list
+  - Edit-scroll regression follow-up landed: inline edit anchoring now runs inside the expanded screen with the live composer height, so the selected task settles into the add-bar slot above the keyboard instead of scrolling off-screen
+  - Edit-scroll follow-up landed: the inline-edit target index now matches the actual rendered list order, and the anchor leaves a bit more space so the `Delete`, `Cancel`, and `Done` row stays visible more often during edit focus

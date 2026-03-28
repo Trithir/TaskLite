@@ -123,3 +123,73 @@ A phase is only done when:
 - The checklist should focus on what the user can verify right now in the app or build, not future features.
 - Keep the checklist concise and practical.
 - Include blockers, known gaps, and anything intentionally not testable yet.
+
+
+
+## Purpose of roles
+Defines how the manager agent and subagents collaborate to build TaskLite.
+
+This file is about execution strategy, not product behavior.
+
+---
+
+## Roles
+
+### Manager Agent
+The manager agent is responsible for:
+- reading AGENTS.md and roadmap.md
+- deciding current phase
+- making architecture decisions
+- spawning subagents for isolated tasks
+- reviewing and integrating subagent work
+- updating roadmap.md
+- preventing feature creep
+
+The manager agent owns:
+- architecture
+- integration
+- roadmap updates
+
+---
+
+### Subagents
+Subagents are responsible for:
+- completing a single, clearly defined task
+- modifying only relevant files
+- following AGENTS.md rules
+- reporting:
+  - summary of changes
+  - files touched
+  - blockers
+  - follow-up notes
+
+Subagents do NOT:
+- make architecture decisions
+- update roadmap.md (unless explicitly told)
+- refactor unrelated code
+- add new features
+
+---
+
+## Delegation Rules
+
+Only delegate tasks that are:
+- isolated
+- low-overlap
+- clearly defined
+- testable independently
+
+Do NOT delegate:
+- architecture decisions
+- cross-cutting refactors
+- vague or open-ended tasks
+
+---
+
+## Concurrency
+
+- Use 2 to 4 subagents maximum at a time
+- Each subagent must work on separate concerns
+- Avoid overlapping file edits
+
+---

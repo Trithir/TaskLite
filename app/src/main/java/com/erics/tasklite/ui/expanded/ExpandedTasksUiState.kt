@@ -13,7 +13,8 @@ data class ExpandedTasksUiState(
 	val editingTaskText: String = "",
 	val deleteTargetTask: ExpandedTaskUiModel? = null,
 	val pendingCompletionTaskIds: Set<Long> = emptySet(),
-	val completionShiftToken: Int = 0
+	val completionShiftToken: Int = 0,
+	val isEditingTask: Boolean = false
 ) {
 	val activeTasks: List<ExpandedTaskUiModel>
 		get() = buildList {

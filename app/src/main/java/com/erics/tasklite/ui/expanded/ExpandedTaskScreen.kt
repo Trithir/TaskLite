@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -73,6 +75,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlin.math.roundToInt
 
 data class ExpandedTaskScreenUiState(
@@ -83,6 +86,8 @@ data class ExpandedTaskScreenUiState(
 	val activeTaskCount: Int = 0,
 	val searchQuery: String = "",
 	val addTaskText: String = "",
+	val editingTaskIndex: Int? = null,
+	val isEditingTask: Boolean = false,
 	val addTaskPlaceholder: String = "Add a task",
 	val notificationEnabled: Boolean = false,
 	val focusAddTaskInput: Boolean = false,
@@ -127,18 +132,37 @@ fun ExpandedTaskScreen(
 	modifier: Modifier = Modifier
 ) {
 	val addTaskFocusRequester = remember { FocusRequester() }
-	var bottomControlsHeightPx by remember { mutableIntStateOf(0) }
+	var composerHeightPx by remember { mutableIntStateOf(0) }
 	val density = LocalDensity.current
 	val topInsetPx = WindowInsets.statusBars.getTop(density)
 	val bottomInsetPx = WindowInsets.navigationBars.getBottom(density)
 	val focusManager = LocalFocusManager.current
 	val backgroundInteractionSource = remember { MutableInteractionSource() }
+	val reservedBottomOverlayHeightPx = if (state.showAddTaskComposer || state.isEditingTask) {
+		composerHeightPx
+	} else {
+		0
+	}
 
 	LaunchedEffect(state.focusAddTaskInput) {
 		if (state.focusAddTaskInput) {
 			addTaskFocusRequester.requestFocus()
 			callbacks.onAddTaskFocusHandled()
 		}
+	}
+
+	LaunchedEffect(state.editingTaskIndex, reservedBottomOverlayHeightPx) {
+		val editingTaskIndex = state.editingTaskIndex ?: return@LaunchedEffect
+		if (reservedBottomOverlayHeightPx == 0) {
+			return@LaunchedEffect
+		}
+
+		listState.awaitItemsAtLeast(editingTaskIndex)
+		listState.scrollEditingTaskAboveBottomOverlay(
+			editingTaskIndex = editingTaskIndex,
+			bottomOverlayHeightPx = reservedBottomOverlayHeightPx.toFloat(),
+			extraGapPx = with(density) { 28.dp.toPx() }
+		)
 	}
 
 	Surface(
@@ -168,7 +192,7 @@ fun ExpandedTaskScreen(
 					top = with(density) { topInsetPx.toDp() } + 12.dp,
 					end = 20.dp,
 					bottom = with(density) {
-						bottomControlsHeightPx.toDp() + bottomInsetPx.toDp()
+						reservedBottomOverlayHeightPx.toDp() + bottomInsetPx.toDp()
 					} + 20.dp
 				),
 				verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -200,7 +224,7 @@ fun ExpandedTaskScreen(
 							callbacks = callbacks,
 							reorderState = reorderState,
 							listState = listState,
-							bottomOverlayHeightPx = bottomControlsHeightPx.toFloat(),
+							bottomOverlayHeightPx = reservedBottomOverlayHeightPx.toFloat(),
 							reorderEnabled = state.searchQuery.isBlank()
 						)
 					}
@@ -242,7 +266,7 @@ fun ExpandedTaskScreen(
 						.imePadding()
 				) {
 					Box(
-						modifier = Modifier.onSizeChanged { bottomControlsHeightPx = it.height }
+						modifier = Modifier.onSizeChanged { composerHeightPx = it.height }
 					) {
 						ExpandedTaskComposer(
 							text = state.addTaskText,
@@ -252,10 +276,6 @@ fun ExpandedTaskScreen(
 							focusRequester = addTaskFocusRequester
 						)
 					}
-				}
-			} else {
-				LaunchedEffect(Unit) {
-					bottomControlsHeightPx = 0
 				}
 			}
 		}
@@ -1016,6 +1036,31 @@ private fun LazyListState.edgeAutoScrollDeltaFor(
 		draggedCenterY < viewportTop -> -stepPx
 		draggedCenterY > viewportBottom -> stepPx
 		else -> 0f
+	}
+}
+
+private suspend fun LazyListState.awaitItemsAtLeast(targetIndex: Int) {
+	val requiredItemCount = (targetIndex + 1).coerceAtLeast(1)
+
+	snapshotFlow { layoutInfo.totalItemsCount }
+		.first { count -> count >= requiredItemCount }
+}
+
+private suspend fun LazyListState.scrollEditingTaskAboveBottomOverlay(
+	editingTaskIndex: Int,
+	bottomOverlayHeightPx: Float,
+	extraGapPx: Float
+) {
+	if (layoutInfo.visibleItemsInfo.none { it.index == editingTaskIndex }) {
+		animateScrollToItem(index = editingTaskIndex.coerceAtLeast(0))
+	}
+
+	val rowInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.index == editingTaskIndex } ?: return
+	val targetBottom = layoutInfo.viewportEndOffset - bottomOverlayHeightPx - extraGapPx
+	val scrollDelta = (rowInfo.offset + rowInfo.size) - targetBottom
+
+	if (kotlin.math.abs(scrollDelta) > 1f) {
+		animateScrollBy(scrollDelta)
 	}
 }
 

@@ -110,13 +110,6 @@ private fun ExpandedTasksRoute(
 		)
 	}
 
-	LaunchedEffect(uiState.editingTask?.id, uiState.editingTaskFlatIndex) {
-		val editingTaskIndex = uiState.editingTaskFlatIndex ?: return@LaunchedEffect
-		delay(150)
-		listState.awaitItemsAtLeast(editingTaskIndex)
-		listState.scrollEditingTaskIntoView(editingTaskIndex)
-	}
-
 	ExpandedTaskScreen(
 		state = uiState.toScreenState(
 			launchMode = launchMode,
@@ -231,6 +224,8 @@ private fun com.erics.tasklite.ui.expanded.ExpandedTasksUiState.toScreenState(
 		activeTaskCount = activeTasks.size,
 		searchQuery = searchQuery,
 		addTaskText = newTaskText,
+		editingTaskIndex = editingTaskFlatIndex,
+		isEditingTask = isEditingTask,
 		notificationEnabled = notificationEnabled,
 		focusAddTaskInput = launchMode == TaskLiteLaunchMode.ADD,
 		showAddTaskComposer = editingTask == null,
@@ -279,11 +274,4 @@ private suspend fun androidx.compose.foundation.lazy.LazyListState.scrollCurrent
 	} else {
 		scrollToItem(index = targetIndex)
 	}
-}
-
-private suspend fun androidx.compose.foundation.lazy.LazyListState.scrollEditingTaskIntoView(
-	editingTaskIndex: Int
-) {
-	val targetIndex = (editingTaskIndex - 1).coerceAtLeast(0)
-	animateScrollToItem(index = targetIndex)
 }
