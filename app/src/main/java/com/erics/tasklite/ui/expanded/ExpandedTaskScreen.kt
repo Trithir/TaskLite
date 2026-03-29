@@ -71,6 +71,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -123,6 +124,13 @@ data class ExpandedTaskRowUiState(
 	val isEditing: Boolean = false,
 	val editText: String = text
 )
+
+object ExpandedTaskScreenTestTags {
+	const val SEARCH_INPUT = "search_input"
+	const val ADD_TASK_INPUT = "add_task_input"
+	const val ADD_TASK_BUTTON = "add_task_button"
+	const val EMPTY_STATE_CARD = "empty_state_card"
+}
 
 @Composable
 fun ExpandedTaskScreen(
@@ -727,7 +735,8 @@ private fun ExpandedTaskComposer(
 			onValueChange = onTextChange,
 			modifier = Modifier
 				.weight(1f)
-					.focusRequester(focusRequester),
+				.focusRequester(focusRequester)
+				.testTag(ExpandedTaskScreenTestTags.ADD_TASK_INPUT),
 				shape = RoundedCornerShape(22.dp),
 				placeholder = {
 					Text(text = placeholder)
@@ -751,6 +760,7 @@ private fun ExpandedTaskComposer(
 
 			AssistChip(
 				onClick = onSubmit,
+				modifier = Modifier.testTag(ExpandedTaskScreenTestTags.ADD_TASK_BUTTON),
 				label = { Text(text = "Add") },
 				shape = CircleShape,
 				colors = AssistChipDefaults.assistChipColors(
@@ -775,7 +785,9 @@ private fun SearchTaskComposer(
 		OutlinedTextField(
 			value = text,
 			onValueChange = onTextChange,
-			modifier = Modifier.fillMaxWidth(),
+			modifier = Modifier
+				.fillMaxWidth()
+				.testTag(ExpandedTaskScreenTestTags.SEARCH_INPUT),
 			shape = RoundedCornerShape(28.dp),
 			placeholder = {
 				Text(text = "Search")
@@ -959,7 +971,9 @@ private fun EmptyStateCard() {
 	}
 
 	Card(
-		modifier = Modifier.fillMaxWidth(),
+		modifier = Modifier
+			.fillMaxWidth()
+			.testTag(ExpandedTaskScreenTestTags.EMPTY_STATE_CARD),
 		shape = RoundedCornerShape(24.dp),
 		colors = CardDefaults.cardColors(
 			containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
