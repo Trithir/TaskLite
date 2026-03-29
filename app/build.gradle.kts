@@ -1,4 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.io.File
+import java.util.Properties
 
 plugins {
 	id("com.android.application")
@@ -7,16 +9,25 @@ plugins {
 	id("com.google.devtools.ksp")
 }
 
+data class ReleaseSigningConfigInput(
+	val storeFile: File,
+	val storePassword: String,
+	val keyAlias: String,
+	val keyPassword: String
+)
+
+val releaseSigningInput = loadReleaseSigningConfigInput(rootDir)
+
 android {
-	namespace = "com.erics.tasklite"
+	namespace = "io.tasklite"
 	compileSdk = 36
 
 	defaultConfig {
-		applicationId = "com.erics.tasklite"
+		applicationId = "io.tasklite"
 		minSdk = 31
 		targetSdk = 35
-		versionCode = 10
-		versionName = "0.1.9"
+		versionCode = 11
+		versionName = "0.1.10"
 
 		testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 		vectorDrawables {
@@ -25,8 +36,19 @@ android {
 	}
 
 	buildTypes {
+		val releaseSigningConfig = releaseSigningInput?.let { signingInput ->
+			signingConfigs.create("release") {
+				storeFile = signingInput.storeFile
+				storePassword = signingInput.storePassword
+				keyAlias = signingInput.keyAlias
+				keyPassword = signingInput.keyPassword
+			}
+		}
+
 		release {
-			isMinifyEnabled = false
+			signingConfig = releaseSigningConfig
+			isMinifyEnabled = true
+			isShrinkResources = true
 			proguardFiles(
 				getDefaultProguardFile("proguard-android-optimize.txt"),
 				"proguard-rules.pro"
@@ -88,4 +110,88 @@ dependencies {
 	androidTestImplementation("androidx.compose.ui:ui-test-junit4")
 	debugImplementation("androidx.compose.ui:ui-tooling")
 	debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+fun loadReleaseSigningConfigInput(rootDir: File): ReleaseSigningConfigInput? {
+	val propertiesFile = rootDir.resolve("release-signing.properties")
+	val fileProperties = loadPropertiesIfPresent(propertiesFile)
+	val storeFilePath = configuredReleaseSigningValue(
+		envName = "TASKLITE_RELEASE_STORE_FILE",
+		propertyName = "storeFile",
+		fileProperties = fileProperties
+	)
+	val storePassword = configuredReleaseSigningValue(
+		envName = "TASKLITE_RELEASE_STORE_PASSWORD",
+		propertyName = "storePassword",
+		fileProperties = fileProperties
+	)
+	val keyAlias = configuredReleaseSigningValue(
+		envName = "TASKLITE_RELEASE_KEY_ALIAS",
+		propertyName = "keyAlias",
+		fileProperties = fileProperties
+	)
+	val keyPassword = configuredReleaseSigningValue(
+		envName = "TASKLITE_RELEASE_KEY_PASSWORD",
+		propertyName = "keyPassword",
+		fileProperties = fileProperties
+	)
+	val configuredValues = listOf(storeFilePath, storePassword, keyAlias, keyPassword)
+	if (configuredValues.all { it.isNullOrBlank() }) {
+		return null
+	}
+
+	if (configuredValues.any { it.isNullOrBlank() }) {
+		error(
+			"Release signing is partially configured. Set all TASKLITE_RELEASE_* environment variables or complete release-signing.properties."
+		)
+	}
+
+	val storeFile = rootDir.resolve(storeFilePath!!)
+	if (!storeFile.isFile) {
+		error("Release signing storeFile does not exist: $storeFile")
+	}
+
+	return ReleaseSigningConfigInput(
+		storeFile = storeFile,
+		storePassword = storePassword!!,
+		keyAlias = keyAlias!!,
+		keyPassword = keyPassword!!
+	)
+}
+
+fun configuredReleaseSigningValue(
+	envName: String,
+	propertyName: String,
+	fileProperties: Properties?
+): String? {
+	return System.getenv(envName)
+		?.takeIf { it.isNotBlank() }
+		?: fileProperties?.getProperty(propertyName)?.takeIf { it.isNotBlank() }
+}
+
+fun loadPropertiesIfPresent(file: File): Properties? {
+	if (!file.isFile) {
+		return null
+	}
+
+	return Properties().apply {
+		file.inputStream().use(::load)
+	}
+}
+
+tasks.register("printReleaseSigningStatus") {
+	group = "help"
+	description = "Shows whether TaskLite release signing is configured locally."
+
+	doLast {
+		if (releaseSigningInput == null) {
+			println("TaskLite release signing is not configured.")
+			println("Provide release-signing.properties or all TASKLITE_RELEASE_* environment variables.")
+			return@doLast
+		}
+
+		println("TaskLite release signing is configured.")
+		println("Store file: ${releaseSigningInput.storeFile}")
+		println("Key alias: ${releaseSigningInput.keyAlias}")
+	}
 }

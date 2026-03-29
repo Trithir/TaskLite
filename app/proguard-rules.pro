@@ -1,1 +1,1 @@
-# Intentionally empty for now.
+-keep class * extends androidx.glance.appwidget.action.ActionCallback { <init>(); }

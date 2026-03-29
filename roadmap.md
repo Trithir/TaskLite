@@ -16,10 +16,12 @@ The goal is to reduce distraction by putting the task ahead of the app.
 - [x] Haptics implemented
 - [x] Empty-state personality prompts implemented
 - [x] Soft overload warning implemented
+- [x] Store-readiness docs drafted
 - [x] Current Task external-open positioning stabilized
 - [x] Completion crash regression fixed
 - [x] Long-row drag offset regression fixed
-- [ ] Polish and QA pass complete
+- [x] Polish and QA pass complete
+- [ ] Store release workflow complete
 
 ---
 
@@ -189,10 +191,50 @@ The goal is to reduce distraction by putting the task ahead of the app.
 
 ### Notes
 - Core task-transition regression coverage now exists in local unit tests for add-at-bottom, delete confirmation, reorder priority updates, uncheck-to-duplicate, and the 300ms completion pause before promotion.
-- Manual/device QA is still required for widget truncation, full expanded-text visibility, widget refresh behavior, notification behavior, and relaunch persistence because those depend on Compose/Glance/system surfaces that are not fully exercised by the current unit-test layer.
-- Current manual QA signal is positive: the app appears stable in desktop/emulator testing with no obvious user-visible bugs reported so far.
-- Remaining device-specific validation is mainly haptics, which is intentionally deferred until the app is available on physical hardware.
+- Manual/device QA was required for widget truncation, full expanded-text visibility, widget refresh behavior, notification behavior, relaunch persistence, and haptics because those depend on Compose/Glance/system surfaces that are not fully exercised by the current unit-test layer.
+- Current QA signal is positive: signed-release physical-device smoke has now passed with no release-blocking issues found.
+- Remaining release work is no longer app-behavior triage; it is internal-track validation plus store/policy/admin prep.
 - Search now lives in a simple always-visible top composer in the expanded view, with live case-insensitive filtering across active and completed tasks; reorder is intentionally disabled while a search query is active to keep filtered drag behavior boring and predictable.
+
+---
+
+## Phase 8: Store readiness and release workflow
+### Goals
+- Prepare the repo and docs for a real Google Play release
+- Keep release claims aligned with the actual shipped app
+
+### Tasks
+- [x] Draft `RELEASE_CHECKLIST.md`
+- [x] Draft `STORE_LISTING_DRAFT.md`
+- [x] Draft `PRIVACY.md`
+- [x] Draft `TEST_PLAN.md`
+- [x] Draft `PLAY_SUBMISSION_NOTES.md`
+- [x] Add release signing placeholder workflow
+- [x] Verify unsigned release app bundle generation path
+- [x] Enable initial release shrinking/minification pass
+- [x] Verify signed release app bundle generation path
+- [x] Finalize signing and release bundle workflow
+- [ ] Produce final Play listing screenshots and graphics
+- [ ] Host privacy policy at a public URL
+- [ ] Complete internal-track release smoke testing
+- [ ] Complete Play Console policy and data safety forms
+
+### Notes
+- Store-readiness docs are now aligned to the real current state: signed local release smoke has passed, the automated UI layer is intentionally tiny, and the remaining work is mostly Play delivery plus store/admin prep.
+- Store listing copy currently reflects the real codebase, including local-only storage, offline use, widget support, optional notification support, and no network-backed collection.
+- Release signing now has a clean local path through `release-signing.properties` or `TASKLITE_RELEASE_*` environment variables, while real secrets remain uncommitted.
+- Verification update: `:app:bundleRelease` now succeeds end to end under the hardened release config, `:app:signingReport` resolves the release keystore and alias successfully, and `jarsigner -verify` confirms the generated `app-release.aab` is signed.
+- Hardening update: release now builds with minification and resource shrinking enabled, and the first keep rule is in place for Glance `ActionCallback` classes.
+- Validation update: unsigned release packaging succeeds with shrinking enabled via `:app:packageReleaseBundle`, producing R8 mapping outputs.
+- Release-surface update: the merged release manifest still picks up WorkManager permissions/components transitively from Glance, but current manager call is to accept that surface for now rather than remove it blindly and risk widget regressions.
+- Workflow update: local signed-release smoke should use `:app:assembleRelease` plus `adb install -r app/build/outputs/apk/release/app-release.apk`, while Play internal-track install remains the final bundle-delivery validation path.
+- Automation update: a minimal Compose `androidTest` smoke layer now covers empty-state launch plus the core add-task flow with a deterministic fake repository.
+- Validation update: signed-release physical-device smoke has now passed with no release-blocking issues found.
+- Submission-prep update: asset, privacy, and Play Console notes now distinguish technical blockers from asset/policy/admin blockers so the remaining launch work is explicit.
+- Remaining blockers for a Play-ready upload path are Play internal-track validation, hosted privacy-policy setup, final listing assets, and Play Console policy/admin entries.
+- Release identity follow-up landed: the Android namespace/application ID and source/test package tree now use `io.tasklite` instead of `com.erics.tasklite`, keeping widget and notification behavior unchanged while making the pre-release package rename explicit in repo and store-prep docs.
+- Release metadata follow-up: app package version advanced from `0.1.9` to `0.1.10`, with `versionCode` incremented to `11` alongside the pre-release app ID rename.
+- Cleanup follow-up landed: removed the now-unused Compose lazy-list compatibility shim before commit prep, leaving the renamed `io.tasklite` tree a little smaller without changing app behavior.
 
 ---
 
@@ -339,3 +381,13 @@ The goal is to reduce distraction by putting the task ahead of the app.
   - Notification icon follow-up landed: the status-bar icon now uses a minimal dot-list glyph instead of a completed checkmark so it reads more clearly as an active task list
   - Edit-scroll regression follow-up landed: inline edit anchoring now runs inside the expanded screen with the live composer height, so the selected task settles into the add-bar slot above the keyboard instead of scrolling off-screen
   - Edit-scroll follow-up landed: the inline-edit target index now matches the actual rendered list order, and the anchor leaves a bit more space so the `Delete`, `Cancel`, and `Done` row stays visible more often during edit focus
+  - Store-readiness follow-up landed: added root release docs for checklist, store listing draft, privacy policy draft, and practical manual test coverage based on the current local-only app state
+  - Release-path follow-up landed: the app build now supports a real non-repo release-signing workflow through `release-signing.properties` or `TASKLITE_RELEASE_*` environment variables, with a committed example file and gitignore coverage for the real secrets file
+  - Release verification follow-up landed: added a `printReleaseSigningStatus` Gradle helper, confirmed the unsigned release bundle path works, confirmed the release signing report stays unset without secrets, and re-verified `testDebugUnitTest` still passes
+  - Release verification follow-up landed: after fixing the local alias mismatch, `bundleRelease` now completes through `signReleaseBundle`, `signingReport` resolves the configured release keystore cleanly, and `jarsigner -verify` confirms the produced `app-release.aab` is signed
+  - Release hardening follow-up landed: release now enables code shrinking and resource shrinking, adds a conservative Glance `ActionCallback` keep rule, and unsigned `packageReleaseBundle` succeeds with R8 mapping outputs generated
+  - Release-surface follow-up landed: dependency tracing confirmed that Glance pulls WorkManager into the merged release manifest, and manager review accepted that transitive surface for now because removing it blindly is riskier than shipping it without `INTERNET`
+  - Release smoke-prep follow-up landed: the practical local device path is now documented as signed `assembleRelease` APK install via `adb`, with Play internal-track install reserved as the final validation path
+  - Release smoke-prep follow-up landed: a tiny Compose `androidTest` layer now checks empty-state launch and add-task composer behavior without trying to fake widget, notification, or haptics coverage
+  - Release validation follow-up landed: signed release APK physical-device smoke passed with no release-blocking issues found
+  - Store-prep follow-up landed: remaining blockers are now primarily Play internal-track validation, hosted privacy-policy setup, final screenshots/graphics, and Play Console policy/admin completion
