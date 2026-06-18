@@ -129,6 +129,82 @@ Official compatibility docs:
 5. Run the `app` configuration.
 6. If you want to build from bash, run `./gradlew tasks` once from the repo root to confirm the wrapper setup is working.
 
+## Build Formats
+
+Run build commands from the repo root:
+
+```powershell
+cd C:\Users\Erics\DEV\TaskLite
+```
+
+### Debug APK
+
+Use this for normal local development installs.
+
+PowerShell:
+
+```powershell
+.\gradlew.bat :app:assembleDebug
+```
+
+Git Bash:
+
+```bash
+./gradlew :app:assembleDebug
+```
+
+Output:
+
+```text
+app/build/outputs/apk/debug/app-debug.apk
+```
+
+### Release APK
+
+Use this for a production-style APK that can be installed locally on a device.
+
+PowerShell:
+
+```powershell
+.\gradlew.bat :app:assembleRelease
+```
+
+Git Bash:
+
+```bash
+./gradlew :app:assembleRelease
+```
+
+Output:
+
+```text
+app/build/outputs/apk/release/app-release.apk
+```
+
+### Release App Bundle
+
+Use this for Google Play upload/internal-track testing.
+
+PowerShell:
+
+```powershell
+.\gradlew.bat :app:bundleRelease
+```
+
+Git Bash:
+
+```bash
+./gradlew :app:bundleRelease
+```
+
+Output:
+
+```text
+app/build/outputs/bundle/release/app-release.aab
+```
+
+Release builds require signing configuration through `release-signing.properties` or `TASKLITE_RELEASE_*` environment variables.
+
 ## Quick Verification
 
 From bash, these should work after setup:

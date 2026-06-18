@@ -30,9 +30,24 @@ class FakeTaskRepository(
 			.sortedByDescending(TaskEntity::completedAt)
 	}
 
-	override suspend fun insertTask(task: TaskEntity): Long {
-		val insertedTask = task.copy(id = if (task.id == 0L) nextId++ else task.id)
-		tasksFlow.value = (tasksFlow.value + insertedTask).sortedWith(taskComparator)
+	override suspend fun insertActiveTaskAtTop(text: String): Long {
+		val activeTasks = tasksFlow.value
+			.filter { it.completedAt == null }
+			.sortedBy(TaskEntity::sortOrder)
+		val insertedTask = TaskEntity(
+			id = nextId++,
+			text = text,
+			sortOrder = 0L
+		)
+		val shiftedTasks = activeTasks.mapIndexed { index, task ->
+			task.copy(sortOrder = index.toLong() + 1L)
+		}
+		val shiftedTaskIds = shiftedTasks.mapTo(mutableSetOf()) { it.id }
+		tasksFlow.value = (
+			tasksFlow.value.filterNot { it.id in shiftedTaskIds } +
+				shiftedTasks +
+				insertedTask
+			).sortedWith(taskComparator)
 		return insertedTask.id
 	}
 

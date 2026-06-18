@@ -34,6 +34,15 @@ interface TaskDao {
 	@Query(
 		"""
 		SELECT * FROM tasks
+		WHERE completedAt IS NULL
+		ORDER BY sortOrder ASC, id ASC
+		"""
+	)
+	suspend fun getIncompleteTasksOrderedOnce(): List<TaskEntity>
+
+	@Query(
+		"""
+		SELECT * FROM tasks
 		WHERE completedAt IS NOT NULL
 		ORDER BY completedAt DESC, id DESC
 		"""

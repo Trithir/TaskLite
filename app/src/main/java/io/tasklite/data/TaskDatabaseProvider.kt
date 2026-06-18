@@ -21,8 +21,10 @@ object TaskDatabaseProvider {
 
 	fun getRepository(context: Context): TaskRepository {
 		val applicationContext = context.applicationContext
+		val database = getDatabase(applicationContext)
 		val repository = TaskRepositoryImpl(
-			taskDao = getDatabase(applicationContext).taskDao(),
+			database = database,
+			taskDao = database.taskDao(),
 			appContext = applicationContext
 		)
 		TaskLiteNotificationCoordinator.ensureStarted(applicationContext)

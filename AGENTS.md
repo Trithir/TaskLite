@@ -54,11 +54,11 @@ Do not add:
 - Tapping add opens expanded view and focuses a new task input.
 - Expanded view stays open until dismissed by the user.
 - Tapping task text in expanded view edits inline.
-- New tasks are inserted at the bottom of the active task list.
+- New tasks are inserted at the top of the active task list and become the Current Task.
 - Reordering changes priority immediately.
 - Dragging a task to the top incomplete position makes it the Current Task.
 - Completed tasks remain in history and are scrollable.
-- Unchecking a completed task creates a new active task with the same text at the new-task location, while leaving the completed task unchanged.
+- Unchecking a completed task creates a new active task with the same text at the top of the active list, while leaving the completed task unchanged.
 - Deleting a task means it is no longer needed, not completed.
 - Deletion requires confirmation.
 

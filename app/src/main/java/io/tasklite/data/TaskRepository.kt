@@ -6,7 +6,7 @@ interface TaskRepository {
 	fun getCurrentTask(): Flow<TaskEntity?>
 	fun getIncompleteTasks(): Flow<List<TaskEntity>>
 	fun getCompletedTasks(): Flow<List<TaskEntity>>
-	suspend fun insertTask(task: TaskEntity): Long
+	suspend fun insertActiveTaskAtTop(text: String): Long
 	suspend fun updateTask(task: TaskEntity)
 	suspend fun reorderTasks(tasks: List<TaskEntity>)
 	suspend fun deleteTask(task: TaskEntity)

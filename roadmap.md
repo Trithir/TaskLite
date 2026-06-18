@@ -98,13 +98,14 @@ The goal is to reduce distraction by putting the task ahead of the app.
   - [x] promote next task to Current Task
 - [x] Implement drag-and-drop reorder
 - [x] Ensure reorder changes priority immediately
-- [x] Implement uncheck-completed behavior as "create new task with same text at new-task location"
+- [x] Implement uncheck-completed behavior as "create new task with same text at the top/current position"
 
 ### Notes
 - Complete now uses a stronger haptic and keeps the completed styling visible during the 300ms pause before the list shifts.
 - Reorder should use light haptic
 - Add currently uses a light haptic when a non-blank task is submitted.
 - Reorder now works on active tasks only, using a long-press drag handle and immediate `sortOrder` persistence so dragging to the top incomplete position makes that task the Current Task.
+- Ordering update: new active tasks and restored completed tasks now insert at the top through a shared transaction-backed repository path, keeping active `sortOrder` values dense from `0`.
 - Platform compromise: reorder currently uses a simple swap-threshold drag interaction inside the active-task section rather than a richer animated list-reorder system. This keeps the implementation small and maintainable for v1.
 - UX follow-up: improve reorder so the dragged task floats between rows with a clearer landing gap/line instead of only swapping one slot at a time.
 - UX follow-up: animate completion so the list visibly shifts upward after the 300ms completion pause.
@@ -190,7 +191,7 @@ The goal is to reduce distraction by putting the task ahead of the app.
 - [x] Test notification behavior
 
 ### Notes
-- Core task-transition regression coverage now exists in local unit tests for add-at-bottom, delete confirmation, reorder priority updates, uncheck-to-duplicate, and the 300ms completion pause before promotion.
+- Core task-transition regression coverage now exists in local unit tests for add-to-current, delete confirmation, reorder priority updates, uncheck-to-duplicate, and the 300ms completion pause before promotion.
 - Manual/device QA was required for widget truncation, full expanded-text visibility, widget refresh behavior, notification behavior, relaunch persistence, and haptics because those depend on Compose/Glance/system surfaces that are not fully exercised by the current unit-test layer.
 - Current QA signal is positive: signed-release physical-device smoke has now passed with no release-blocking issues found.
 - Remaining release work is no longer app-behavior triage; it is internal-track validation plus store/policy/admin prep.
@@ -243,7 +244,7 @@ The goal is to reduce distraction by putting the task ahead of the app.
 - Completion control is a circular bubble, not a square checkbox
 - Expanded view stays open until dismissed
 - Tap text edits inline
-- New tasks are added at the bottom
+- New tasks are added at the top and become the Current Task
 - Completed tasks remain scrollable in history
 - Reordering changes priority immediately
 - Persistent notification opens expanded view
@@ -282,7 +283,7 @@ The goal is to reduce distraction by putting the task ahead of the app.
   - `compileSdk` moved to `36` while `targetSdk` remains `35`, keeping runtime behavior unchanged while satisfying current library requirements
 - Phase 2 progress this session:
   - Replaced the placeholder screen with a Room-backed expanded task view
-  - Added inline edit, add-at-bottom, complete, uncheck-completed, and delete-confirmation flows
+  - Added inline edit, add-to-current, complete, uncheck-completed, and delete-confirmation flows
   - Kept manager-owned integration and roadmap updates in-thread while delegating isolated UI and state slices per `EXECUTION_PLAN.md`
 - Phase 3 progress this session:
   - Added stronger completion haptics and light add haptics
@@ -390,4 +391,5 @@ The goal is to reduce distraction by putting the task ahead of the app.
   - Release smoke-prep follow-up landed: the practical local device path is now documented as signed `assembleRelease` APK install via `adb`, with Play internal-track install reserved as the final validation path
   - Release smoke-prep follow-up landed: a tiny Compose `androidTest` layer now checks empty-state launch and add-task composer behavior without trying to fake widget, notification, or haptics coverage
   - Release validation follow-up landed: signed release APK physical-device smoke passed with no release-blocking issues found
-  - Store-prep follow-up landed: remaining blockers are now primarily Play internal-track validation, hosted privacy-policy setup, final screenshots/graphics, and Play Console policy/admin completion
+- Store-prep follow-up landed: remaining blockers are now primarily Play internal-track validation, hosted privacy-policy setup, final screenshots/graphics, and Play Console policy/admin completion
+- Ordering-system follow-up landed: new tasks and unchecked completed tasks now become the Current Task via a shared transactional top-insert path, with existing active tasks shifted down to keep `sortOrder` clean.

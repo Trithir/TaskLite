@@ -158,14 +158,8 @@ class ExpandedTasksViewModel(
 	fun submitNewTask() {
 		viewModelScope.launch {
 			val text = newTaskText.value.normalizeTaskText() ?: return@launch
-			val sortOrder = nextActiveSortOrder()
 
-			repository.insertTask(
-				TaskEntity(
-					text = text,
-					sortOrder = sortOrder
-				)
-			)
+			repository.insertActiveTaskAtTop(text)
 			cancelNewTask()
 		}
 	}
@@ -283,12 +277,7 @@ class ExpandedTasksViewModel(
 	private suspend fun uncheckCompletedTaskInternal(taskId: Long) {
 		val task = findCompletedTask(taskId) ?: return
 
-		repository.insertTask(
-			TaskEntity(
-				text = task.text,
-				sortOrder = nextActiveSortOrder()
-			)
-		)
+		repository.insertActiveTaskAtTop(task.text)
 		clearTransientState(task.id)
 	}
 
@@ -315,11 +304,6 @@ class ExpandedTasksViewModel(
 		if (deleteTargetTaskId.value == taskId) {
 			cancelDeleteTask()
 		}
-	}
-
-	private fun nextActiveSortOrder(): Long {
-		val maxSortOrder = incompleteTasks.value.maxOfOrNull { it.sortOrder } ?: -1L
-		return maxSortOrder + 1L
 	}
 
 	private fun String.normalizeTaskText(): String? {

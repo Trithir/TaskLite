@@ -41,7 +41,7 @@ class ExpandedTasksViewModelTest {
 	}
 
 	@Test
-	fun submitNewTask_trimsText_andAddsAtBottomOfActiveList() = runTest(dispatcher) {
+	fun submitNewTask_trimsText_andMakesTaskCurrent() = runTest(dispatcher) {
 		val repository = FakeTaskRepository(
 			listOf(
 				TaskEntity(id = 1L, text = "Current", sortOrder = 0L),
@@ -58,10 +58,11 @@ class ExpandedTasksViewModelTest {
 		advanceUntilIdle()
 
 		assertEquals(
-			listOf("Current", "Later", "New task"),
+			listOf("New task", "Current", "Later"),
 			repository.incompleteSnapshot().map(TaskEntity::text)
 		)
-		assertEquals(2L, repository.incompleteSnapshot().last().sortOrder)
+		assertEquals(listOf(0L, 1L, 2L), repository.incompleteSnapshot().map(TaskEntity::sortOrder))
+		assertEquals("New task", viewModel.uiState.value.currentTask?.text)
 		assertFalse(viewModel.uiState.value.isAddTaskFieldVisible)
 		assertEquals("", viewModel.uiState.value.newTaskText)
 	}
@@ -101,7 +102,7 @@ class ExpandedTasksViewModelTest {
 	}
 
 	@Test
-	fun uncheckCompletedTask_createsNewActiveCopy_andKeepsHistoryEntry() = runTest(dispatcher) {
+	fun uncheckCompletedTask_createsNewCurrentTask_andKeepsHistoryEntry() = runTest(dispatcher) {
 		val repository = FakeTaskRepository(
 			listOf(
 				TaskEntity(id = 1L, text = "Current", sortOrder = 0L),
@@ -116,10 +117,11 @@ class ExpandedTasksViewModelTest {
 		advanceUntilIdle()
 
 		assertEquals(
-			listOf("Current", "Done thing"),
+			listOf("Done thing", "Current"),
 			repository.incompleteSnapshot().map(TaskEntity::text)
 		)
-		assertEquals(1L, repository.incompleteSnapshot().last().sortOrder)
+		assertEquals(listOf(0L, 1L), repository.incompleteSnapshot().map(TaskEntity::sortOrder))
+		assertEquals("Done thing", viewModel.uiState.value.currentTask?.text)
 		assertEquals(listOf("Done thing"), repository.completedSnapshot().map(TaskEntity::text))
 	}
 
@@ -250,9 +252,24 @@ private class FakeTaskRepository(
 			.sortedByDescending(TaskEntity::completedAt)
 	}
 
-	override suspend fun insertTask(task: TaskEntity): Long {
-		val insertedTask = task.copy(id = if (task.id == 0L) nextId++ else task.id)
-		tasksFlow.value = (tasksFlow.value + insertedTask).sortedWith(taskComparator)
+	override suspend fun insertActiveTaskAtTop(text: String): Long {
+		val activeTasks = tasksFlow.value
+			.filter { it.completedAt == null }
+			.sortedBy(TaskEntity::sortOrder)
+		val insertedTask = TaskEntity(
+			id = nextId++,
+			text = text,
+			sortOrder = 0L
+		)
+		val shiftedTasks = activeTasks.mapIndexed { index, task ->
+			task.copy(sortOrder = index.toLong() + 1L)
+		}
+		val shiftedTaskIds = shiftedTasks.mapTo(mutableSetOf()) { it.id }
+		tasksFlow.value = (
+			tasksFlow.value.filterNot { it.id in shiftedTaskIds } +
+				shiftedTasks +
+				insertedTask
+			).sortedWith(taskComparator)
 		return insertedTask.id
 	}
 
